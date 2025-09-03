@@ -8,8 +8,8 @@ app.use(express.json());
 app.use(cors());
 
 // 🔹 Configuración del BOT de Telegram
-const TELEGRAM_BOT_TOKEN = "8202650308:AAHNRuK3AsQLTEEvr7ubKob1ZG-39Qn3Au4";
-const TELEGRAM_CHAT_ID = "-4669903719";
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID
 
 // Endpoint para recibir SOS
 app.post("/sos", async (req, res) => {
