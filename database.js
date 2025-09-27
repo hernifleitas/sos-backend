@@ -1,5 +1,7 @@
 // database.js - Implementación SOLO PostgreSQL
 const { Pool } = require('pg');
+const dotenv = require('dotenv');
+dotenv.config();
 
 class Database {
   constructor() {
@@ -42,7 +44,20 @@ class Database {
           status TEXT DEFAULT 'pending',
           reset_token TEXT,
           reset_token_expires TIMESTAMP,
-          role TEXT DEFAULT 'user'
+          role TEXT DEFAULT 'user',
+          premium_expires_at TIMESTAMP
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS premium_subscriptions (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          start_date TIMESTAMP NOT NULL DEFAULT NOW(),
+          end_date TIMESTAMP NOT NULL,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
         );
       `);
 
@@ -160,7 +175,11 @@ class Database {
 
   getAllUsers() {
     return (async () => {
-      const { rows } = await this.pool.query('SELECT id, nombre, email, moto, color, created_at FROM users WHERE is_active = TRUE');
+      const { rows } = await this.pool.query(`
+        SELECT id, nombre, email, moto, color, created_at, status, role, premium_expires_at
+        FROM users
+        WHERE is_active = TRUE
+      `);
       return rows;
     })();
   }
@@ -217,11 +236,134 @@ class Database {
     })();
   }
 
-  isAdmin(id) {
-    return (async () => {
-      const { rows } = await this.pool.query('SELECT role FROM users WHERE id = $1 AND is_active = TRUE', [id]);
-      return rows[0]?.role === 'admin';
-    })();
+  async makePremium(userId, days = 30) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Calcular fecha de expiración
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + days);
+      
+      // Actualizar rol del usuario
+      await client.query(
+        'UPDATE users SET role = $1, premium_expires_at = $2, updated_at = NOW() WHERE id = $3', 
+        ['premium', endDate, userId]
+      );
+      
+      // Registrar la suscripción
+      await client.query(
+        `INSERT INTO premium_subscriptions (user_id, start_date, end_date) 
+         VALUES ($1, NOW(), $2) RETURNING id`,
+        [userId, endDate]
+      );
+      
+      await client.query('COMMIT');
+      return { success: true, expiresAt: endDate };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error en makePremium:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async removePremium(userId) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Verificar si el usuario es admin (no se puede quitar premium a un admin)
+      const adminCheck = await client.query(
+        'SELECT role FROM users WHERE id = $1 AND role = $2',
+        [userId, 'admin']
+      );
+      
+      if (adminCheck.rows.length > 0) {
+        return { changes: 0, message: 'No se puede quitar premium a un administrador' };
+      }
+      
+      // Quitar premium y limpiar fecha de expiración
+      const result = await client.query(
+        `UPDATE users 
+         SET role = 'user', premium_expires_at = NULL, updated_at = NOW() 
+         WHERE id = $1 AND role = 'premium'
+         RETURNING id`,
+        [userId]
+      );
+      
+      // Desactivar suscripciones activas
+      await client.query(
+        `UPDATE premium_subscriptions 
+         SET is_active = FALSE, updated_at = NOW() 
+         WHERE user_id = $1 AND is_active = TRUE`,
+        [userId]
+      );
+      
+      await client.query('COMMIT');
+      return { 
+        changes: result.rowCount,
+        success: result.rowCount > 0,
+        message: result.rowCount > 0 ? 'Premium eliminado correctamente' : 'Usuario no encontrado o no era premium'
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error en removePremium:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async isPremium(userId) {
+    const client = await this.pool.connect();
+    try {
+      // Primero verificamos si el usuario es admin (siempre premium)
+      const adminCheck = await client.query(
+        'SELECT role FROM users WHERE id = $1 AND role = $2 AND is_active = TRUE',
+        [userId, 'admin']
+      );
+      
+      if (adminCheck.rows.length > 0) return true;
+      
+      // Verificar usuario premium con expiración
+      const { rows } = await client.query(
+        `SELECT role, premium_expires_at FROM users 
+         WHERE id = $1 AND is_active = TRUE`,
+        [userId]
+      );
+      
+      if (rows.length === 0) return false;
+      
+      const user = rows[0];
+      
+      // Si no es premium, retornar falso
+      if (user.role !== 'premium') return false;
+      
+      // Si no tiene fecha de expiración, asumir premium permanente
+      if (!user.premium_expires_at) return true;
+      
+      // Verificar si la suscripción ha expirado
+      const now = new Date();
+      const expiresAt = new Date(user.premium_expires_at);
+      
+      if (now > expiresAt) {
+        // Si expiró, actualizar el rol a 'user'
+        await client.query(
+          'UPDATE users SET role = $1, premium_expires_at = NULL, updated_at = NOW() WHERE id = $2',
+          ['user', userId]
+        );
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error en isPremium:', error);
+      return false;
+    } finally {
+      client.release();
+    }
   }
 
   // =================== CHAT ===================

@@ -29,13 +29,20 @@ module.exports = function initChat(io) {
     const room = 'global';
     socket.join(room);
 
-    // Enviar mensaje
+    // Enviar mensaje (solo Premium o Admin)
     socket.on('message:send', async (payload = {}, ack) => {
       try {
         const content = String(payload.content || '').trim();
         const targetRoom = String(payload.room || room);
         if (!content) {
           if (ack) ack({ success: false, message: 'Mensaje vacío' });
+          return;
+        }
+
+        // Check de Premium/Admin antes de permitir enviar
+        const hasPremium = await database.isPremium(socket.user.id);
+        if (!hasPremium) {
+          if (ack) ack({ success: false, message: 'Función Premium requerida' });
           return;
         }
 

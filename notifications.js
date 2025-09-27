@@ -1,4 +1,11 @@
 // notifications.js
+// Asegurar fetch en Node (Render puede no tener global fetch disponible)
+let fetchFn = global.fetch;
+if (typeof fetchFn !== 'function') {
+  // Carga dinámica para compatibilidad con CJS en Node >=14
+  fetchFn = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+}
+
 const database = require('./database');
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
@@ -15,7 +22,7 @@ async function sendPush(tokens, title, body, data = {}) {
   for (const chunk of chunks) {
     try {
       const messages = chunk.map((to) => ({ to, title, body, data, sound: 'default', priority: 'high' }));
-      const res = await fetch(EXPO_PUSH_URL, {
+      const res = await fetchFn(EXPO_PUSH_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(messages),
@@ -27,7 +34,7 @@ async function sendPush(tokens, title, body, data = {}) {
       }
       sent += chunk.length;
     } catch (e) {
-      console.error('Error enviando push a Expo:', e);
+      console.error('Error enviando push a Expo:', e?.message || e);
     }
   }
   return { success: true, sent };
@@ -38,7 +45,7 @@ async function sendToAllExcept(userId, title, body, data = {}) {
     const tokens = await database.getAllTokensExcept(userId);
     return await sendPush(tokens, title, body, data);
   } catch (e) {
-    console.error('Error obteniendo tokens para push:', e);
+    console.error('Error obteniendo tokens para push:', e?.message || e);
     return { success: false };
   }
 }

@@ -71,12 +71,14 @@ class EmailService {
   // Enviar email con link de reset de contraseña
   async sendPasswordResetLinkEmail(user, resetToken) {
     try {
-      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+      // FORZAR deep link a la app SIEMPRE (evitar https://localhost u otras webs)
+      const appScheme = process.env.APP_SCHEME || 'ridersos';
+      const resetLink = `${appScheme}://reset-password?token=${resetToken}`;
       
       const mailOptions = {
         from: process.env.EMAIL_FROM || 'Rider SOS <noreply@ridersos.com>',
         to: user.email,
-        subject: '🔐 Cambiar Contraseña - Rider SOS',
+        subject: 'Rider SOS',
         html: this.generatePasswordResetLinkEmailHTML(user, resetLink),
         text: this.generatePasswordResetLinkEmailText(user, resetLink)
       };
@@ -468,16 +470,8 @@ Este es un email automático, por favor no respondas a este mensaje.
             </div>
             
             <div class="footer">
-                <p><strong>Rider SOS</strong> - Tu seguridad es nuestra prioridad</p>
-                <p>Gracias por confiar en nosotros para mantenerte seguro mientras trabajas.</p>
-                <div class="social-links">
-                    <a href="#">Soporte</a> |
-                    <a href="#">Términos de Uso</a> |
-                    <a href="#">Privacidad</a>
-                </div>
-                <p style="margin-top: 15px; font-size: 12px;">
-                    Este email fue enviado automáticamente. Por favor no respondas a este mensaje.
-                </p>
+                <p>Rider SOS - Sistema de Seguridad para Repartidores</p>
+                <p>Este es un email automático, por favor no respondas a este mensaje.</p>
             </div>
         </div>
     </body>

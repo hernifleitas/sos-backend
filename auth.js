@@ -9,6 +9,15 @@ class AuthService {
     this.jwtExpiresIn = '7d'; // Token válido por 7 días
   }
 
+  // Helper: verificar si es Premium (o Admin)
+  async isPremium(userId) {
+    try {
+      return await database.isPremium(userId);
+    } catch (_) {
+      return false;
+    }
+  }
+
   // Generar hash de contraseña
   async hashPassword(password) {
     const saltRounds = 12;
@@ -122,14 +131,14 @@ class AuthService {
       if (user.status === 'pending') {
         return {
           success: false,
-          message: 'Tu cuenta está pendiente de aprobación por un administrador'
+          message: 'Tu cuenta está en revisión por un administrador. Te avisaremos cuando se apruebe y podrás iniciar sesión.'
         };
       }
 
       if (user.status === 'rejected') {
         return {
           success: false,
-          message: 'Tu cuenta ha sido rechazada. Contacta al administrador'
+          message: 'Tu cuenta fue rechazada. Si crees que es un error, contacta al administrador.'
         };
       }
 
@@ -154,7 +163,8 @@ class AuthService {
           email: user.email,
           moto: user.moto,
           color: user.color,
-          created_at: user.created_at
+          created_at: user.created_at,
+          role: user.role || 'user'
         },
         token
       };
@@ -194,7 +204,8 @@ class AuthService {
           email: user.email,
           moto: user.moto,
           color: user.color,
-          created_at: user.created_at
+          created_at: user.created_at,
+          role: user.role || 'user'
         }
       };
     } catch (error) {
@@ -352,7 +363,6 @@ class AuthService {
       };
     }
   }
-
   // Reset de contraseña con token
   async resetPasswordWithToken(token, newPassword) {
     try {
@@ -432,6 +442,22 @@ class AuthService {
       };
     } catch (error) {
       console.error('Error obteniendo usuarios pendientes:', error);
+      return {
+        success: false,
+        message: 'Error interno del servidor'
+      };
+    }
+  }
+
+  async getAllUsers() {
+    try {
+      const users = await database.getAllUsers();
+      return {
+        success: true,
+        users
+      };
+    } catch (error) {
+      console.error('Error obteniendo todos los usuarios:', error);
       return {
         success: false,
         message: 'Error interno del servidor'
@@ -567,5 +593,6 @@ class AuthService {
   }
 }
 
-module.exports = new AuthService();
 
+
+module.exports = new AuthService();

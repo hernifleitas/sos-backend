@@ -19,7 +19,13 @@ app.use(cors());
 
 // Guardar info de riders en memoria
 let riders = {};
-
+// Memoria de última alerta por rider con datos y timestamp (para ventana de gracia)
+// { [riderId]: { tipo, nombre, moto, color, ubicacion, fechaHora, timestamp } }
+let lastAlerts = {};
+const ALERT_GRACE_MS = 10 * 60 * 1000; // 10 minutos de gracia
+// Anti-burst: recordar último recibido por rider para filtrar ráfagas de 'actualizacion'
+// { [riderId]: { ts: number, fechaIso: string, tipo: string } }
+let lastReceive = {};
 // Función para enviar notificación a otros usuarios sobre SOS
 const notificarSOSAOtrosUsuarios = (sosData) => {
   // Esta función se puede expandir para enviar notificaciones push reales
@@ -37,14 +43,96 @@ const notificarSOSAOtrosUsuarios = (sosData) => {
 // Recibir ubicación/SOS
 app.post("/sos", async (req, res) => {
   try {
-    const { riderId, nombre, moto, color, ubicacion, fechaHora, tipo } = req.body;
-    if (!riderId || !nombre || !moto || !color || !ubicacion || !ubicacion.lat || !ubicacion.lng || !tipo) {
+    const { riderId, nombre, moto, color, ubicacion, fechaHora, tipo, tipoSOSActual, cancel } = req.body;
+    // Validar sin rechazar coordenadas 0,0
+    const latValida = typeof ubicacion?.lat === 'number' && !Number.isNaN(ubicacion.lat);
+    const lngValida = typeof ubicacion?.lng === 'number' && !Number.isNaN(ubicacion.lng);
+    if (!riderId || !nombre || !moto || !color || !ubicacion || !latValida || !lngValida || !tipo) {
       return res.status(400).json({ error: "Faltan datos" });
     }
 
     // Verificar si es un nuevo SOS (no actualización)
     const esNuevoSOS = tipo && tipo !== "normal" && tipo !== "actualizacion" && !riders[riderId];
     const esSOSInicial = tipo && tipo !== "normal" && tipo !== "actualizacion" && riders[riderId]?.tipo !== tipo;
+
+    // Anti-burst: ignorar ráfagas de 'actualizacion' del mismo rider en < 3s o con misma fechaHora
+    const nowTs = Date.now();
+    const last = lastReceive[riderId];
+    if (tipo === 'actualizacion') {
+      const mismaFecha = last && last.fechaIso === fechaHora;
+      const ventanaCorta = last && (nowTs - last.ts) < 3000; // 3 segundos
+      if (mismaFecha || ventanaCorta) {
+        // Actualizar solo stamp interno y devolver success sin cambiar estado
+        lastReceive[riderId] = { ts: nowTs, fechaIso: fechaHora, tipo };
+        return res.json({ success: true, ignored: true, reason: 'anti-burst-actualizacion' });
+      }
+    }
+    // Registrar última recepción
+    lastReceive[riderId] = { ts: nowTs, fechaIso: fechaHora, tipo };
+
+    // Determinar tipo a almacenar: si llega 'actualizacion', conservar el tipo previo (robo/accidente)
+    const tipoPrevio = riders[riderId]?.tipo;
+    // Considerar memoria de última alerta si no hay tipo SOS previo (p.ej. reinicio de server o app bloqueada)
+    const memoriaValida = lastAlerts[riderId] && (nowTs - lastAlerts[riderId].timestamp) <= ALERT_GRACE_MS
+      ? lastAlerts[riderId].tipo
+      : null;
+    const lastSosPrevio = riders[riderId]?.lastSosTipo || null;
+    const tipoSOSPrevio = (tipoPrevio && tipoPrevio !== 'normal' && tipoPrevio !== 'actualizacion') ? tipoPrevio : null;
+    const candidatoSOS = tipoSOSPrevio || lastSosPrevio || memoriaValida || tipoSOSActual || null;
+    // REGLA: 'actualizacion' NO cambia el tipo; solo actualiza ubicacion. Si hay un SOS previo, se mantiene.
+    const tipoAAlmacenar = (tipo === 'actualizacion')
+      ? (tipoSOSPrevio || lastSosPrevio || memoriaValida || tipoPrevio || 'normal')
+      : tipo;
+
+    // Calcular lastSosTipo para mantener el tipo SOS histórico reciente
+    let lastSosTipo = riders[riderId]?.lastSosTipo || null;
+    if (tipoAAlmacenar !== 'normal' && tipoAAlmacenar !== 'actualizacion') {
+      lastSosTipo = tipoAAlmacenar; // actualizar cuando hay un SOS real
+      // Actualizar memoria de última alerta con datos completos
+      lastAlerts[riderId] = { tipo: tipoAAlmacenar, nombre, moto, color, ubicacion, fechaHora: new Date(fechaHora), timestamp: nowTs };
+    } else if (tipo === 'actualizacion') {
+      if (lastAlerts[riderId]) {
+        lastAlerts[riderId] = { ...lastAlerts[riderId], ubicacion, fechaHora: new Date(fechaHora), timestamp: nowTs, tipo: lastAlerts[riderId].tipo || riders[riderId]?.lastSosTipo || tipoSOSActual || lastAlerts[riderId]?.tipo };
+      } else if ((tipoSOSActual && tipoSOSActual !== 'normal') || riders[riderId]?.lastSosTipo || tipoSOSPrevio) {
+        // Crear memoria si hay información de SOS previo
+        const tipoMem = tipoSOSActual && tipoSOSActual !== 'normal' ? tipoSOSActual : (riders[riderId]?.lastSosTipo || tipoSOSPrevio);
+        lastAlerts[riderId] = { tipo: tipoMem, nombre, moto, color, ubicacion, fechaHora: new Date(fechaHora), timestamp: nowTs };
+      }
+    }
+
+    // Manejo especial de 'normal': solo aceptar si cancel === true
+    if (tipo === 'normal') {
+      const memoria = lastAlerts[riderId];
+      const memoriaVigente = memoria && ((nowTs - memoria.timestamp) <= ALERT_GRACE_MS);
+      if (cancel === true) {
+        // cancelación explícita
+        delete lastAlerts[riderId];
+        if (riders[riderId]) {
+          riders[riderId].lastSosTipo = null;
+          riders[riderId].tipo = 'normal';
+        }
+        console.log(`[CANCEL] Cancel explícito para ${riderId}. Limpiando alerta.`);
+      } else if (memoriaVigente) {
+        // Ignorar 'normal' no intencional durante gracia
+        if (riders[riderId]) {
+          riders[riderId].tipo = riders[riderId].lastSosTipo || memoria?.tipo || 'actualizacion';
+        }
+        console.log(`[IGNORE] 'normal' sin cancel ignorado para ${riderId} (gracia activa).`);
+      } else {
+        // No hay memoria vigente: aceptar normal
+        delete lastAlerts[riderId];
+        console.log(`[NORMAL] Sin memoria vigente, se acepta 'normal' para ${riderId}.`);
+      }
+    } else if (tipo === 'actualizacion') {
+      // Mantener fresh la ubicación y hora en memoria durante la gracia; si viene tipoSOSActual, también refrescar tipo
+      if (lastAlerts[riderId]) {
+        lastAlerts[riderId] = { ...lastAlerts[riderId], ubicacion, fechaHora: new Date(fechaHora), timestamp: nowTs, tipo: lastAlerts[riderId].tipo || riders[riderId]?.lastSosTipo || tipoSOSActual || lastAlerts[riderId]?.tipo };
+      } else if ((tipoSOSActual && tipoSOSActual !== 'normal') || riders[riderId]?.lastSosTipo || tipoSOSPrevio) {
+        // Crear memoria si hay información de SOS previo
+        const tipoMem = tipoSOSActual && tipoSOSActual !== 'normal' ? tipoSOSActual : (riders[riderId]?.lastSosTipo || tipoSOSPrevio);
+        lastAlerts[riderId] = { tipo: tipoMem, nombre, moto, color, ubicacion, fechaHora: new Date(fechaHora), timestamp: nowTs };
+      }
+    }
 
     // Guardamos/actualizamos info del rider
     riders[riderId] = {
@@ -53,12 +141,13 @@ app.post("/sos", async (req, res) => {
       color,
       ubicacion,
       fechaHora: new Date(fechaHora),
-      tipo, // "robo", "pinchazo", "normal" o "" si no hay SOS
+      tipo: tipoAAlmacenar,
+      lastSosTipo, // nuevo campo para recordar el último tipo SOS real
       lastUpdate: Date.now(),
-      appActive: tipo === "normal" ? true : riders[riderId]?.appActive || false, // Solo true si es tipo normal
+      appActive: tipoAAlmacenar === "normal" ? true : riders[riderId]?.appActive || false,
     };
 
-    console.log(`Ubicación recibida de ${nombre} (${riderId}):`, ubicacion, "tipo:", tipo);
+    console.log(`Ubicación recibida de ${nombre} (${riderId}):`, ubicacion, "tipo:", tipo, "almacenadoComo:", tipoAAlmacenar, "cancel:", cancel === true);
     
     // Notificar a otros usuarios si es un nuevo SOS
     if (esNuevoSOS || esSOSInicial) {
@@ -69,7 +158,7 @@ app.post("/sos", async (req, res) => {
         color,
         ubicacion,
         fechaHora,
-        tipo
+        tipo: tipoAAlmacenar
       });
 
       // Opción A: excluir al emisor usando JWT del header Authorization
@@ -82,11 +171,15 @@ app.post("/sos", async (req, res) => {
           if (decoded?.id) emitterUserId = decoded.id;
         }
 
-        const title = tipo === 'robo' ? '🚨 SOS ROBO' : (tipo === 'accidente' ? '🚑 SOS ACCIDENTE' : '🚨 SOS');
-        const body = `${nombre} (${moto} - ${color}) en ${Number(ubicacion.lat).toFixed(4)}, ${Number(ubicacion.lng).toFixed(4)}`;
+        const title = tipoAAlmacenar === 'robo'
+          ? '🔔 NUEVA ALERTA DE ROBO'
+          : (tipoAAlmacenar === 'accidente'
+            ? '🔔 NUEVA ALERTA DE ACCIDENTE'
+            : '🔔 NUEVA ALERTA SOS');
+        const body = `${nombre} (${moto} - ${color})`;
         const data = {
           kind: 'sos',
-          tipo,
+          tipo: tipoAAlmacenar,
           riderId,
           nombre,
           moto,
@@ -99,7 +192,6 @@ app.post("/sos", async (req, res) => {
         if (emitterUserId) {
           await notifications.sendToAllExcept(emitterUserId, title, body, data);
         } else {
-          // Si no hay token válido, enviar a todos los tokens registrados
           const tokens = await database.getAllTokens();
           await notifications.sendPush(tokens, title, body, data);
         }
@@ -126,12 +218,16 @@ app.get("/riders", (req, res) => {
       const r = riders[riderId];
       const tiempoInactivo = now - r.lastUpdate;
       
+      const sosActivo = r.tipo && r.tipo !== "normal" && r.tipo !== "actualizacion";
+      // Mantener SOS activos visibles sin expirar por tiempo
+      if (sosActivo) return true;
+
       // Si es tipo "normal" (bandera verde), solo mostrar por 2 minutos
       if (r.tipo === "normal") {
         return tiempoInactivo <= dosMinutos;
       }
-      
-      // Para otros tipos, mostrar por 5 minutos
+
+      // Si no hay tipo establecido, ocultar después de 5 minutos
       return tiempoInactivo <= cincoMinutos;
     })
     .map((riderId) => {
@@ -167,19 +263,34 @@ app.get("/alertas", (req, res) => {
   const alertasArray = Object.keys(riders)
     .filter((riderId) => {
       const r = riders[riderId];
-      const tiempoInactivo = now - r.lastUpdate;
-      
-      // Solo mostrar alertas SOS activas (no normales)
-      return r.tipo && r.tipo !== "normal" && r.tipo !== "actualizacion" && tiempoInactivo <= cincoMinutos;
+      // Considerar activo si:
+      // - tipo es SOS real (no normal/actualizacion), o
+      // - tipo es 'actualizacion' y hay lastSosTipo, o
+      // - tipo es 'normal'/'actualizacion' pero hay memoria lastAlerts dentro de la gracia
+      const esSOSReal = r.tipo && r.tipo !== "normal" && r.tipo !== "actualizacion";
+      const esActualizacionConSOS = r.tipo === 'actualizacion' && !!r.lastSosTipo;
+      const memoria = lastAlerts[riderId];
+      const memoriaVigente = memoria && ((now - memoria.timestamp) <= ALERT_GRACE_MS);
+      const lastSosReciente = !!r.lastSosTipo && ((now - r.lastUpdate) <= ALERT_GRACE_MS);
+      return esSOSReal || esActualizacionConSOS || memoriaVigente || lastSosReciente;
     })
     .map((riderId) => {
       const r = riders[riderId];
+      // Resolver tipo a mostrar: priorizar 'tipo' SOS real; si es 'actualizacion' o 'normal', usar lastSosTipo o memoria
+      let tipoMostrar = r.tipo;
+      if (tipoMostrar === 'actualizacion' || tipoMostrar === 'normal') {
+        if (r.lastSosTipo) tipoMostrar = r.lastSosTipo;
+        const memoria = lastAlerts[riderId];
+        if ((!r.lastSosTipo || tipoMostrar === 'normal') && memoria && ((now - memoria.timestamp) <= ALERT_GRACE_MS)) {
+          tipoMostrar = memoria.tipo;
+        }
+      }
       return {
         riderId,
         nombre: r.nombre,
         moto: r.moto,
         color: r.color,
-        tipo: r.tipo,
+        tipo: tipoMostrar,
         ubicacion: r.ubicacion,
         fechaHora: r.fechaHora,
         tiempoTranscurrido: Math.floor((now - r.lastUpdate) / 1000) // en segundos
@@ -190,15 +301,18 @@ app.get("/alertas", (req, res) => {
   res.json(alertasArray);
 });
 
+// Configuración de rutas API
+const API_PREFIX = '/api';
+
 // Rutas de autenticación
-app.use('/auth', authRoutes);
+app.use(`${API_PREFIX}/auth`, authRoutes);
 // Rutas de chat
-app.use('/chat', chatRoutes);
+app.use(`${API_PREFIX}/chat`, chatRoutes);
 // Rutas de notificaciones
-app.use('/notifications', notificationsRoutes);
+app.use(`${API_PREFIX}/notifications`, notificationsRoutes);
 
 // Middleware para verificar autenticación en rutas protegidas
-app.use('/protected', authService.authenticateToken.bind(authService));
+app.use(`${API_PREFIX}/protected`, authService.authenticateToken.bind(authService));
 
 const PORT = process.env.PORT || 10000;
 const HOST = process.env.HOST || '0.0.0.0'; 
