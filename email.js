@@ -208,8 +208,8 @@ class EmailService {
   // Generar texto del email de reset de contraseña
   generatePasswordResetEmailText(user, newPassword) {
     return `
-Nueva Contraseña - Rider SOS
-Seguridad para Repartidores
+
+Rider SOS - Seguridad para Repartidores
 
 Hola ${user.nombre},
 

@@ -1,21 +1,24 @@
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
 require('dotenv').config();
+const bodyParser = require('body-parser');
+const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 
 const authRoutes = require('./api/auth');
-const authService = require('./auth');
 const chatRoutes = require('./api/chat');
 const notificationsRoutes = require('./api/notifications');
 const notifications = require('./notifications');
+const premiumRoutes = require('./api/premium');
 const database = require('./database');
 
 const app = express();
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(exoress.static('public'));
 app.use(cors());
+
 
 // Guardar info de riders en memoria
 let riders = {};
@@ -167,7 +170,9 @@ app.post("/sos", async (req, res) => {
         const token = authHeader && authHeader.split(' ')[1];
         let emitterUserId = null;
         if (token) {
-          const decoded = authService.verifyToken(token);
+          const jwt = require('jsonwebtoken');
+          const jwtSecret = process.env.JWT_SECRET || 'rider-sos-secret-key-2024';
+          const decoded = jwt.verify(token, jwtSecret);
           if (decoded?.id) emitterUserId = decoded.id;
         }
 
@@ -304,15 +309,68 @@ app.get("/alertas", (req, res) => {
 // Configuración de rutas API
 const API_PREFIX = '/api';
 
-// Rutas de autenticación
+// Rutas de autenticación (sin prefijo para compatibilidad)
+app.use('/auth', authRoutes);
+
 app.use(`${API_PREFIX}/auth`, authRoutes);
 // Rutas de chat
 app.use(`${API_PREFIX}/chat`, chatRoutes);
 // Rutas de notificaciones
 app.use(`${API_PREFIX}/notifications`, notificationsRoutes);
+// Rutas de premium
+app.use(`${API_PREFIX}/premium`, premiumRoutes);
 
+app.get('/premium', (req, res) => {
+    console.log('acceso a /premium -sirviendo index.html');
+    const filePath = path.join(__dirname, 'public', 'premium', 'index.html');
+    console.log("ruta del archivo:", filePath);
+    res.sendFile(filePath);
+});
+
+app.get('/premium/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'premium', 'index.html'));
+})
+
+
+app.get('/premium/styles.css',(req, res)=> {
+  res.sendFile(path.join(__dirname, 'public', 'premium', 'styles.css'));
+})
+
+app.get('/premium/script.js',(req, res)=> {
+  res.sendFile(path.join(__dirname, 'public', 'premium', 'script.js'));
+})
+
+//debug
+console.log('Rutas auth:', authRoutes.stack
+  .filter(r => r.route)
+  .map(r => r.route.path));
 // Middleware para verificar autenticación en rutas protegidas
-app.use(`${API_PREFIX}/protected`, authService.authenticateToken.bind(authService));
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: 'Token de acceso requerido'
+    });
+  }
+
+  try {
+    const jwt = require('jsonwebtoken');
+    const jwtSecret = process.env.JWT_SECRET || 'rider-sos-secret-key-2024';
+    const decoded = jwt.verify(token, jwtSecret);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(403).json({
+      success: false,
+      message: 'Token inválido o expirado'
+    });
+  }
+};
+
+app.use(`${API_PREFIX}/protected`, authenticateToken);
 
 const PORT = process.env.PORT || 10000;
 const HOST = process.env.HOST || '0.0.0.0'; 

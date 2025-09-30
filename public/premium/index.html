@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOS Delivery - Premium</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🚀 SOS Delivery Premium</h1>
+            <p class="subtitle">Desbloquea funciones exclusivas para tu negocio</p>
+        </header>
+
+        <div class="content">
+            <!-- Sección de beneficios -->
+            <div class="benefits-section">
+                <h2>✨ Beneficios Premium</h2>
+                <div class="benefits-grid">
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🎯</div>
+                        <h3>Prioridad en Alertas</h3>
+                        <p>Recibe notificaciones prioritarias de emergencias</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">📊</div>
+                        <h3>Estadísticas Avanzadas</h3>
+                        <p>Analiza tu rendimiento con métricas detalladas</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">🔧</div>
+                        <h3>Herramientas Exclusivas</h3>
+                        <p>Accede a funciones avanzadas de gestión</p>
+                    </div>
+                    <div class="benefit-card">
+                        <div class="benefit-icon">💬</div>
+                        <h3>Soporte Premium</h3>
+                        <p>Atención personalizada y respuesta rápida</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección de precios -->
+            <div class="pricing-section">
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <h3>Premium Mensual</h3>
+                        <div class="price">
+                            <span class="currency">$</span>
+                            <span class="amount">5.000</span>
+                            <span class="period">/mes</span>
+                        </div>
+                    </div>
+                    <ul class="features-list">
+                        <li>✅ Todas las funciones premium</li>
+                        <li>✅ Soporte prioritario</li>
+                        <li>✅ Estadísticas avanzadas</li>
+                        <li>✅ Sin permanencia</li>
+                    </ul>
+                    <button id="subscribe-btn" class="subscribe-btn">
+                        Suscribirse Ahora
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sección de login -->
+            <div id="login-section" class="login-section">
+                <h3>Iniciar Sesión</h3>
+                <p>Para continuar, ingresa tus credenciales de SOS Delivery</p>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="email">Email:</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Contraseña:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="login-btn">Iniciar Sesión</button>
+                </form>
+            </div>
+
+            <!-- Sección de pago (oculta inicialmente) -->
+            <div id="payment-section" class="payment-section" style="display: none;">
+                <h3>💳 Completar Pago</h3>
+                <p>Estás a un paso de activar tu suscripción Premium</p>
+                <div id="mercadopago-button"></div>
+            </div>
+
+            <!-- Sección de éxito -->
+            <div id="success-section" class="success-section" style="display: none;">
+                <div class="success-icon">🎉</div>
+                <h3>¡Suscripción Activada!</h3>
+                <p>Ya tienes acceso a todas las funciones Premium</p>
+                <button onclick="openApp()" class="open-app-btn">Abrir SOS Delivery</button>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>&copy; 2024 SOS Delivery. Todos los derechos reservados.</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
