@@ -284,23 +284,26 @@ class Database {
   
       let subscription = null;
       let userId = null;
-
-      // Intentar buscar por paymentId primero
+  
+      // Convertir todos los IDs a string para evitar overflow
+      const paymentIdStr = String(paymentData.mercadopago_payment_id || '');
+      const preferenceIdStr = String(paymentData.mercadopago_preference_id || '');
       const searchPaymentId = String(userIdOrPaymentId);
+  
+      // Intentar buscar por mercadopago_payment_id primero
       const subscriptionResult = await client.query(
         'SELECT * FROM premium_subscriptions WHERE mercadopago_payment_id = $1',
         [searchPaymentId]
       );
-
-      if(subscriptionResult.rows.length > 0){
+  
+      if (subscriptionResult.rows.length > 0) {
         // Encontró suscripción existente por paymentId
         subscription = subscriptionResult.rows[0];
         userId = subscription.user_id;
       } else {
         // No encontró por paymentId, asumir que es userId y crear nueva suscripción
         userId = userIdOrPaymentId;
-        
-        // Crear nueva suscripción
+  
         const insertResult = await client.query(`
           INSERT INTO premium_subscriptions (
             user_id,
@@ -315,23 +318,23 @@ class Database {
           RETURNING *
         `, [
           userId,
-          paymentData.payment_id || null,
-          paymentData.preference_id || null,
+          paymentIdStr,
+          preferenceIdStr,
           paymentData.amount || 5000.00,
           paymentData.currency || 'ARS',
           'approved',
           paymentData.payment_method || 'manual'
         ]);
-        
+  
         subscription = insertResult.rows[0];
       }
-
+  
+      // Calcular fechas de suscripción
       const startDate = new Date();
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + 30);
   
-      // Actualizar suscripción con fechas
-      const paymentIdStr = paymentData.mercadopago_payment_id?.toString() || null;
+      // Actualizar la suscripción con fechas y estado
       await client.query(`
         UPDATE premium_subscriptions
         SET status = $1,
@@ -348,8 +351,8 @@ class Database {
         endDate,
         paymentIdStr
       ]);
-
-      // Actualizar usuario
+  
+      // Actualizar el usuario como premium
       await client.query(`
         UPDATE users
         SET role = $1,
@@ -359,16 +362,16 @@ class Database {
       `, ['premium', endDate, userId]);
   
       await client.query('COMMIT');
-      return {success:true, endDate, userId: userId};
-  
+      return { success: true, endDate, userId };
     } catch (error) {
       await client.query('ROLLBACK');
-      console.error('Error activando suscripcion premium:', error);
+      console.error('Error activando suscripción premium:', error);
       throw error;
     } finally {
       client.release();
     }
   }
+  
   
   async isPremiumActive(userId) { 
     try {
