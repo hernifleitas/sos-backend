@@ -72,12 +72,11 @@ router.get('/subscriptions', authenticateToken, async (req, res) => {
 // Activar suscripción después del pago
 router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
   try {
-    const paymentId = String(req.params.paymentId);
+    const { paymentId } = req.params;
 
     const paymentData = {
       payment_method: 'mercadopago',
-      preference_id: req.body.preference_id || null,
-      mercadopago_payment_id: paymentId
+      preference_id: req.body.preference_id || null
     };
 
     const result = await database.activatePremiumSubscription(paymentId, paymentData);
@@ -96,11 +95,13 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
   }
 });
 
-// Crear nueva suscripción premium (Checkout Pro)
+// Crear nueva suscripción premium (para iniciar proceso de pago)
+// Crear nueva suscripción premium (para iniciar proceso de pago) - Checkout Pro
 router.post('/create-subscription', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // 1️⃣ Crear objeto preference para Checkout Pro
     const preference = {
       items: [
         { title: "Premium SOS", quantity: 1, unit_price: 5000 }
@@ -115,7 +116,7 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
       metadata: { userId }
     };
 
-    // Llamada a la API de MercadoPago
+    // 2️⃣ Llamar a la API de MercadoPago
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
@@ -132,18 +133,14 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
       return res.status(500).json({ success: false, message: 'Error creando preferencia de pago' });
     }
 
-    // Generar ID provisional único para evitar duplicados
-    const provisionalPaymentId = `PENDING-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    // Guardar en DB la suscripción pendiente
+    // 3️⃣ Guardar en DB la suscripción pendiente
     await database.createPremiumSubscription(userId, {
       preference_id: data.id,
-      mercadopago_payment_id: provisionalPaymentId,
       amount: 5000,
-      currency: 'ARS',
-      status: 'pending'
+      currency: 'ARS'
     });
 
+    // 4️⃣ Devolver init_point al frontend
     res.json({ success: true, init_point: data.init_point, preferenceId: data.id });
 
   } catch (error) {
@@ -155,15 +152,18 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
 // Webhook de MercadoPago
 router.post('/webhook', express.json(), async (req, res) => {
   try {
-    const paymentIdRaw = req.body.id || req.body.data?.id || req.query.id;
+    // Tomar datos de body o query params
+    const data = req.body.data || req.query;
 
-    if (!paymentIdRaw) {
+    // Obtener paymentId según cómo llegue
+    const paymentId = data.id || data['data.id'] || req.query.id;
+
+    if (!paymentId) {
       console.error("❌ No llegó paymentId en webhook");
       return res.status(400).json({ success: false, message: "Falta paymentId" });
     }
 
-    const paymentId = String(paymentIdRaw);
-
+    // Llamada a Mercado Pago para obtener info del pago
     const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
       headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` }
     });
@@ -174,11 +174,11 @@ router.post('/webhook', express.json(), async (req, res) => {
       const userId = payment.metadata?.userId;
       if (!userId) return res.status(400).json({ success: false, message: "Falta userId" });
 
-      // Activar suscripción actualizando el registro pendiente
+      // Activar suscripción
       const result = await database.activatePremiumSubscription(userId, {
         payment_method: payment.payment_type_id,
-        mercadopago_preference_id: payment.metadata?.preference_id || null,
-        mercadopago_payment_id: String(payment.id),
+        preference_id: payment.metadata?.preference_id || null,
+        payment_id: payment.id,
         amount: payment.transaction_amount,
         currency: payment.currency_id,
         status: payment.status,
@@ -195,11 +195,12 @@ router.post('/webhook', express.json(), async (req, res) => {
   }
 });
 
-// Activar premium manualmente (SOLO DESARROLLO)
+// 🧪 RUTA DE PRUEBA: Activar premium manualmente (SOLO DESARROLLO)
 router.post('/activate-manual', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     
+    // Crear suscripción manual por 30 días
     const result = await database.activatePremiumSubscription(userId, {
       payment_method: 'manual',
       preference_id: 'MANUAL-' + Date.now(),
@@ -230,6 +231,7 @@ router.post('/activate-manual', authenticateToken, async (req, res) => {
 // Verificar estado premium por user ID (para admin)
 router.get('/status/:userId', authenticateToken, async (req, res) => {
   try {
+    // Verificar si el usuario es admin
     const isAdmin = await database.isAdmin(req.user.id);
     if (!isAdmin) {
       return res.status(403).json({
