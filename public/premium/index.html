@@ -5,101 +5,147 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SOS Delivery - Premium</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://sdk.mercadopago.com/js/v2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Estilos para el overlay de carga */
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.2rem;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #00a8ff;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-right: 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Estilos para los mensajes de estado */
+        #statusMessage {
+            display: none;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        #statusMessage.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        #statusMessage.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        /* Estilo para la fecha de expiración */
+        #premiumExpiry {
+            display: none;
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #00a8ff;
+            font-weight: 500;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1>🚀 SOS Delivery Premium</h1>
-            <p class="subtitle">Desbloquea funciones exclusivas para tu negocio</p>
+    <!-- Overlay de carga -->
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <span>Procesando tu solicitud...</span>
+    </div>
+
+    <div class="app-container">
+        <header class="app-header">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                <span>SOS Delivery <strong>Premium</strong></span>
+            </div>
         </header>
 
-        <div class="content">
-            <!-- Sección de beneficios -->
-            <div class="benefits-section">
-                <h2>✨ Beneficios Premium</h2>
-                <div class="benefits-grid">
-                    <div class="benefit-card">
-                        <div class="benefit-icon">🎯</div>
-                        <h3>Prioridad en Alertas</h3>
-                        <p>Recibe notificaciones prioritarias de emergencias</p>
-                    </div>
-                    <div class="benefit-card">
-                        <div class="benefit-icon">📊</div>
-                        <h3>Estadísticas Avanzadas</h3>
-                        <p>Analiza tu rendimiento con métricas detalladas</p>
-                    </div>
-                    <div class="benefit-card">
-                        <div class="benefit-icon">🔧</div>
-                        <h3>Herramientas Exclusivas</h3>
-                        <p>Accede a funciones avanzadas de gestión</p>
-                    </div>
-                    <div class="benefit-card">
-                        <div class="benefit-icon">💬</div>
-                        <h3>Soporte Premium</h3>
-                        <p>Atención personalizada y respuesta rápida</p>
-                    </div>
-                </div>
-            </div>
+        <main class="main-content">
+            <section class="welcome-section">
+                <h1>Herramientas Premium para Repartidores</h1>
+                <p class="subtitle">Mejora tu experiencia con funcion exclusivas</p>
+                
+                <!-- Mensaje de estado -->
+                <div id="statusMessage"></div>
+                <div id="premiumExpiry"></div>
+            </section>
 
-            <!-- Sección de precios -->
-            <div class="pricing-section">
-                <div class="pricing-card">
-                    <div class="pricing-header">
-                        <h3>Premium Mensual</h3>
-                        <div class="price">
-                            <span class="currency">$</span>
-                            <span class="amount">5.000</span>
-                            <span class="period">/mes</span>
-                        </div>
+            <div class="cards-container">
+                <!-- Tarjeta 1: Chats Exclusivos -->
+                <div class="feature-card">
+                    <div class="card-icon">
+                        <i class="fas fa-comments"></i>
                     </div>
-                    <ul class="features-list">
-                        <li>✅ Todas las funciones premium</li>
-                        <li>✅ Soporte prioritario</li>
-                        <li>✅ Estadísticas avanzadas</li>
-                        <li>✅ Sin permanencia</li>
+                    <h2>Chats Exclusivos</h2>
+                    <p>Conéctate con otros repartidores en tu zona y comparte información en tiempo real.</p>
+                    <ul class="feature-list">
+                        <li><i class="fas fa-check"></i> Comunicación directa</li>
+                        <li><i class="fas fa-check"></i> Alertas de zona</li>
+                        <li><i class="fas fa-check"></i> Soporte prioritario</li>
                     </ul>
-                    <button id="subscribe-btn" class="subscribe-btn">
-                        Suscribirse Ahora
+                    <button class="btn btn-primary" id="activateChats">
+                        <span>Activar Chats</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- Tarjeta 2: Modo Repartiendo -->
+                <div class="feature-card active">
+                    <div class="card-badge">POPULAR</div>
+                    <div class="card-icon">
+                        <i class="fas fa-motorcycle"></i>
+                    </div>
+                    <h2>Modo Repartiendo</h2>
+                    <p>Aparece en el mapa de riders y mejora tu visibilidad para recibir más pedidos.</p>
+                    <ul class="feature-list">
+                        <li><i class="fas fa-check"></i> Ubicación en tiempo real</li>
+                        <li><i class="fas fa-check"></i> Prioridad en pedidos</li>
+                        <li><i class="fas fa-check"></i> Estadísticas de rendimiento</li>
+                    </ul>
+                    <button class="btn btn-secondary" id="activatePremiumBtn">
+                        <i class="fas fa-crown"></i> Hacerme Premium - $5.000/mes
                     </button>
                 </div>
             </div>
+        </main>
 
-            <!-- Sección de login -->
-            <div id="login-section" class="login-section">
-                <h3>Iniciar Sesión</h3>
-                <p>Para continuar, ingresa tus credenciales de SOS Delivery</p>
-                <form id="login-form">
-                    <div class="form-group">
-                        <label for="email">Email:</label>
-                        <input type="email" id="email" name="email" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="password">Contraseña:</label>
-                        <input type="password" id="password" name="password" required>
-                    </div>
-                    <button type="submit" class="login-btn">Iniciar Sesión</button>
-                </form>
+        <footer class="app-footer">
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="status-label">Estado:</span>
+                    <span class="status-value connected">Conectado</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Riders cercanos:</span>
+                    <span class="status-value">12</span>
+                </div>
             </div>
-
-            <!-- Sección de pago (oculta inicialmente) -->
-            <div id="payment-section" class="payment-section" style="display: none;">
-                <h3>💳 Completar Pago</h3>
-                <p>Estás a un paso de activar tu suscripción Premium</p>
-                <div id="mercadopago-button"></div>
-            </div>
-
-            <!-- Sección de éxito -->
-            <div id="success-section" class="success-section" style="display: none;">
-                <div class="success-icon">🎉</div>
-                <h3>¡Suscripción Activada!</h3>
-                <p>Ya tienes acceso a todas las funciones Premium</p>
-                <button onclick="openApp()" class="open-app-btn">Abrir SOS Delivery</button>
-            </div>
-        </div>
-
-        <footer class="footer">
-            <p>&copy; 2024 SOS Delivery. Todos los derechos reservados.</p>
         </footer>
     </div>
 

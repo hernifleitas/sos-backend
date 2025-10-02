@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const authService = require('../auth');
+const {authService} = require('./auth');
 const database = require('../database');
 
 // GET /chat/history?room=global&limit=50&before=ISO_DATE

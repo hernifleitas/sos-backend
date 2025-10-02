@@ -6,7 +6,7 @@ const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 
-const authRoutes = require('./api/auth');
+const {router: authRoutes} = require('./api/auth');
 const chatRoutes = require('./api/chat');
 const notificationsRoutes = require('./api/notifications');
 const notifications = require('./notifications');
@@ -16,9 +16,36 @@ const database = require('./database');
 const app = express();
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(exoress.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 
+//middleware de debugging 
+
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url} - ${new Date().toISOString()}`);
+  next();
+})
+
+// Servir archivos estáticos de premium
+app.use('/premium', express.static(path.join(__dirname, 'public/premium')));
+
+// Ruta principal para index.html de premium
+app.get('/premium', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/premium/index.html'));
+});
+
+// Rutas de retorno de MercadoPago
+app.get('/premium/success', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/premium/success.html'));
+});
+
+app.get('/premium/failure', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/premium/failure.html'));
+});
+
+app.get('/premium/pending', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/premium/pending.html'));
+});
 
 // Guardar info de riders en memoria
 let riders = {};
@@ -309,6 +336,11 @@ app.get("/alertas", (req, res) => {
 // Configuración de rutas API
 const API_PREFIX = '/api';
 
+console.log('chatRoutes', chatRoutes)
+console.log('authRoutes:', authRoutes);
+console.log('notificationsRoutes:', notificationsRoutes);
+console.log('premiumRoutes:', premiumRoutes);
+
 // Rutas de autenticación (sin prefijo para compatibilidad)
 app.use('/auth', authRoutes);
 
@@ -319,26 +351,6 @@ app.use(`${API_PREFIX}/chat`, chatRoutes);
 app.use(`${API_PREFIX}/notifications`, notificationsRoutes);
 // Rutas de premium
 app.use(`${API_PREFIX}/premium`, premiumRoutes);
-
-app.get('/premium', (req, res) => {
-    console.log('acceso a /premium -sirviendo index.html');
-    const filePath = path.join(__dirname, 'public', 'premium', 'index.html');
-    console.log("ruta del archivo:", filePath);
-    res.sendFile(filePath);
-});
-
-app.get('/premium/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'premium', 'index.html'));
-})
-
-
-app.get('/premium/styles.css',(req, res)=> {
-  res.sendFile(path.join(__dirname, 'public', 'premium', 'styles.css'));
-})
-
-app.get('/premium/script.js',(req, res)=> {
-  res.sendFile(path.join(__dirname, 'public', 'premium', 'script.js'));
-})
 
 //debug
 console.log('Rutas auth:', authRoutes.stack
@@ -381,7 +393,7 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 // Inicializar chat en tiempo real
 require('./chat')(io);
-
+  
 server.listen(PORT, HOST, () => {
   console.log(`🚀 Servidor Rider SOS corriendo en http://${HOST}:${PORT}`);
   console.log(`📧 Sistema de emails configurado`);

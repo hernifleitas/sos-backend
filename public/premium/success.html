@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Pago Exitoso! - SOS Delivery Premium</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #27ae60;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            animation: scaleIn 0.5s ease-out;
+        }
+        
+        .success-icon::after {
+            content: "✓";
+            color: white;
+            font-size: 48px;
+            font-weight: bold;
+        }
+        
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+        
+        .info-value {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        .btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon"></div>
+        <h1>¡Pago Exitoso!</h1>
+        <p class="subtitle">Tu suscripción Premium ha sido activada</p>
+        
+        <div id="statusMessage" class="status-message"></div>
+        
+        <div class="info-box">
+            <div class="info-item">
+                <span class="info-label">Estado:</span>
+                <span class="info-value" id="paymentStatus">Procesando...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Válido hasta:</span>
+                <span class="info-value" id="expiryDate">Calculando...</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">ID de Pago:</span>
+                <span class="info-value" id="paymentId">-</span>
+            </div>
+        </div>
+        
+        <button class="btn" id="returnBtn" onclick="returnToApp()">
+            <span id="btnText">Volver a la App</span>
+        </button>
+    </div>
+    
+    <script>
+        // Obtener parámetros de la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentId = urlParams.get('payment_id');
+        const status = urlParams.get('status');
+        const token = localStorage.getItem('sos_delivery_token');
+        
+        document.getElementById('paymentId').textContent = paymentId || 'N/A';
+        
+        // Activar premium automáticamente
+        async function activatePremium() {
+            if (!paymentId || !token) {
+                showError('Faltan datos para activar el premium');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/premium/activate/${paymentId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('paymentStatus').textContent = '✓ Activado';
+                    document.getElementById('paymentStatus').style.color = '#27ae60';
+                    
+                    if (data.expiresAt) {
+                        const expiryDate = new Date(data.expiresAt).toLocaleDateString('es-ES');
+                        document.getElementById('expiryDate').textContent = expiryDate;
+                    }
+                    
+                    showSuccess('¡Tu cuenta Premium ha sido activada exitosamente!');
+                } else {
+                    showError(data.message || 'Error activando premium');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Error al activar tu cuenta premium');
+            }
+        }
+        
+        function showSuccess(message) {
+            const statusMsg = document.getElementById('statusMessage');
+            statusMsg.textContent = message;
+            statusMsg.className = 'status-message success';
+            statusMsg.style.display = 'block';
+        }
+        
+        function showError(message) {
+            const statusMsg = document.getElementById('statusMessage');
+            statusMsg.textContent = message;
+            statusMsg.className = 'status-message error';
+            statusMsg.style.display = 'block';
+            document.getElementById('paymentStatus').textContent = '✗ Error';
+            document.getElementById('paymentStatus').style.color = '#e74c3c';
+        }
+        
+        function returnToApp() {
+            // Intentar abrir la app con deep link
+            window.location.href = 'ridersos://premium-success';
+            
+            // Fallback: cerrar ventana después de 1 segundo
+            setTimeout(() => {
+                window.close();
+            }, 1000);
+        }
+        
+        // Ejecutar activación al cargar
+        if (status === 'approved' && paymentId) {
+            activatePremium();
+        } else {
+            showError('El pago no fue aprobado');
+        }
+    </script>
+</body>
+</html>

@@ -92,7 +92,8 @@ class AuthService {
         email: email.toLowerCase().trim(),
         password: hashedPassword,
         moto: moto.trim(),
-        color: color.trim()
+        color: color.trim(),
+        telefono: telefono.trim()
       });
 
       return {
@@ -105,7 +106,8 @@ class AuthService {
           moto: newUser.moto,
           color: newUser.color,
           created_at: newUser.created_at,
-          status: 'pending'
+          status: 'pending',
+          telefono: newUser.telefono
         }
       };
     } catch (error) {
@@ -166,7 +168,8 @@ class AuthService {
           moto: user.moto,
           color: user.color,
           created_at: user.created_at,
-          role: user.role || 'user'
+          role: user.role || 'user',
+          telefono: user.telefono
         },
         token
       };
@@ -207,7 +210,8 @@ class AuthService {
           moto: user.moto,
           color: user.color,
           created_at: user.created_at,
-          role: user.role || 'user'
+          role: user.role || 'user',
+          telefono: user.telefono
         }
       };
     } catch (error) {
@@ -630,11 +634,45 @@ router.post('/login', async (req, res) => {
 });
 
 // Ruta para verificar token
-router.get('/verify', authService.authenticateToken.bind(authService), (req, res) => {
-  res.json({
-    success: true,
-    user: req.user
-  });
+router.get('/verify', authService.authenticateToken.bind(authService), async (req, res) => {
+  try {
+    // Obtener datos actualizados del usuario desde la base de datos
+    const database = require('../database');
+    const userResult = await database.pool.query(
+      'SELECT id, nombre, email, moto, color, role, telefono, created_at, premium_expires_at FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        moto: user.moto,
+        color: user.color,
+        role: user.role, // Este es el role actualizado desde la DB
+        telefono: user.telefono,
+        created_at: user.created_at,
+        premium_expires_at: user.premium_expires_at
+      }
+    });
+  } catch (error) {
+    console.error('Error en /verify:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
 });
 
 // Ruta para actualizar perfil
@@ -772,5 +810,4 @@ router.post('/admin/reject-user/:userId', authService.authenticateToken.bind(aut
     });
   }
 });
-
-module.exports = router;
+module.exports = {router, authService}

@@ -1,5 +1,5 @@
 // chat.js
-const authService = require('./auth');
+const {authService} = require('./api/auth');
 const database = require('./database');
 const notifications = require('./notifications');
 

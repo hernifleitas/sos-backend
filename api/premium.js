@@ -69,37 +69,167 @@ router.get('/subscriptions', authenticateToken, async (req, res) => {
   }
 });
 
+// Activar suscripción después del pago
+router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+
+    const paymentData = {
+      payment_method: 'mercadopago',
+      preference_id: req.body.preference_id || null
+    };
+
+    const result = await database.activatePremiumSubscription(paymentId, paymentData);
+
+    res.json({
+      success: true,
+      message: 'Suscripción activada con éxito',
+      expiresAt: result.endDate
+    });
+  } catch (error) {
+    console.error('Error activando suscripción premium:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno al activar suscripción'
+    });
+  }
+});
+
 // Crear nueva suscripción premium (para iniciar proceso de pago)
+// Crear nueva suscripción premium (para iniciar proceso de pago) - Checkout Pro
 router.post('/create-subscription', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { preference_id } = req.body;
-    
-    if (!preference_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'preference_id es requerido'
-      });
-    }
-    
-    const mercadopagoData = {
-      preference_id: preference_id,
-      amount: 5000.00,
-      currency: 'ARS'
+
+    // 1️⃣ Crear objeto preference para Checkout Pro
+    const preference = {
+      items: [
+        { title: "Premium SOS", quantity: 1, unit_price: 5000 }
+      ],
+      back_urls: {
+        success: "https://unslated-daftly-dean.ngrok-free.dev/premium/success",
+        failure: "https://unslated-daftly-dean.ngrok-free.dev/premium/failure",
+        pending: "https://unslated-daftly-dean.ngrok-free.dev/premium/pending"
+      },
+      notification_url: "https://unslated-daftly-dean.ngrok-free.dev/webhook",
+      auto_return: "approved",
+      metadata: { userId }
     };
+
+    // 2️⃣ Llamar a la API de MercadoPago
+    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify(preference)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Error creando preferencia MP:", data);
+      return res.status(500).json({ success: false, message: 'Error creando preferencia de pago' });
+    }
+
+    // 3️⃣ Guardar en DB la suscripción pendiente
+    await database.createPremiumSubscription(userId, {
+      preference_id: data.id,
+      amount: 5000,
+      currency: 'ARS'
+    });
+
+    // 4️⃣ Devolver init_point al frontend
+    res.json({ success: true, init_point: data.init_point, preferenceId: data.id });
+
+  } catch (error) {
+    console.error("Error en create-subscription:", error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
+
+// Webhook de MercadoPago
+router.post('/webhook', express.json(), async (req, res) => {
+  try {
+    const data = req.body;
+
+    console.log("📩 Webhook recibido:", JSON.stringify(data, null, 2));
+
+    // Validamos que sea un evento de pago
+    if (data.type === 'payment' && data.data && data.data.id) {
+      const paymentId = data.data.id;
+
+      // Llamamos a la API de MercadoPago para obtener info del pago
+      const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        headers: {
+          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
+        }
+      });
+
+      const payment = await response.json();
+      console.log("✅ Detalles del pago:", payment);
+
+      if (payment.status === 'approved') {
+        const userId = payment.metadata?.userId;
+
+        if (!userId) {
+          console.error("❌ No llegó userId en metadata");
+          return res.status(400).json({ success: false, message: "Falta userId en metadata" });
+        }
+
+        // Guardamos la suscripción como activa en la DB
+        const result = await database.activatePremiumSubscription(userId, {
+          payment_method: payment.payment_type_id,
+          preference_id: payment.metadata?.preference_id || null,
+          payment_id: payment.id,
+          amount: payment.transaction_amount,
+          currency: payment.currency_id,
+          status: payment.status,
+          approved_at: payment.date_approved
+        });
+
+        console.log(`⭐ Usuario ${userId} activado como PREMIUM hasta ${result.endDate}`);
+      }
+    }
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("❌ Error en webhook:", error);
+    res.status(500).json({ success: false });
+  }
+});
+
+
+// 🧪 RUTA DE PRUEBA: Activar premium manualmente (SOLO DESARROLLO)
+router.post('/activate-manual', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
     
-    const result = await database.createPremiumSubscription(userId, mercadopagoData);
-    
+    // Crear suscripción manual por 30 días
+    const result = await database.activatePremiumSubscription(userId, {
+      payment_method: 'manual',
+      preference_id: 'MANUAL-' + Date.now(),
+      payment_id: 'MANUAL-PAYMENT-' + Date.now(),
+      amount: 5000,
+      currency: 'ARS',
+      status: 'approved',
+      approved_at: new Date().toISOString()
+    });
+
+    console.log(`✅ Usuario ${userId} activado como PREMIUM manualmente hasta ${result.endDate}`);
+
     res.json({
       success: true,
-      subscription: result.subscription,
-      message: 'Suscripción creada exitosamente'
+      message: '¡Premium activado manualmente!',
+      expiresAt: result.endDate,
+      isPremium: true
     });
   } catch (error) {
-    console.error('Error creando suscripción:', error);
+    console.error('Error activando premium manual:', error);
     res.status(500).json({
       success: false,
-      message: 'Error interno del servidor'
+      message: error.message || 'Error interno del servidor'
     });
   }
 });
