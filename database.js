@@ -338,13 +338,13 @@ class Database {
             end_date = $4,
             is_active = TRUE,
             updated_at = NOW()
-        WHERE id = $5
+        WHERE mercadopago_payment_id = $5
       `, [
         'approved',
         paymentData.payment_method || 'manual',
         startDate,
         endDate,
-        subscription.id
+        paymentData.mercadopago_payment_id.toString()
       ]);
 
       // Actualizar usuario
