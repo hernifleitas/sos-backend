@@ -259,8 +259,8 @@ class Database {
       `,
       [
         userId,
-        mercadopagoData.payment_id || null,
-        mercadopagoData.preference_id || null,
+        String(mercadopagoData.payment_id || ''),
+        String(mercadopagoData.preference_id || ''),
         mercadopagoData.amount || 5000.00,
         mercadopagoData.currency || 'ARS',
         'pending'
@@ -286,9 +286,10 @@ class Database {
       let userId = null;
 
       // Intentar buscar por paymentId primero
+      const searchPaymentId = String(userIdOrPaymentId);
       const subscriptionResult = await client.query(
         'SELECT * FROM premium_subscriptions WHERE mercadopago_payment_id = $1',
-        [userIdOrPaymentId]
+        [searchPaymentId]
       );
 
       if(subscriptionResult.rows.length > 0){
@@ -330,6 +331,7 @@ class Database {
       endDate.setDate(endDate.getDate() + 30);
   
       // Actualizar suscripción con fechas
+      const paymentIdStr = paymentData.mercadopago_payment_id?.toString() || null;
       await client.query(`
         UPDATE premium_subscriptions
         SET status = $1,
@@ -344,7 +346,7 @@ class Database {
         paymentData.payment_method || 'manual',
         startDate,
         endDate,
-        paymentData.mercadopago_payment_id.toString()
+        paymentIdStr
       ]);
 
       // Actualizar usuario
