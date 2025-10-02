@@ -152,45 +152,40 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
 // Webhook de MercadoPago
 router.post('/webhook', express.json(), async (req, res) => {
   try {
-    const data = req.body;
+    // Tomar datos de body o query params
+    const data = req.body.data || req.query;
 
-    console.log("📩 Webhook recibido:", JSON.stringify(data, null, 2));
+    // Obtener paymentId según cómo llegue
+    const paymentId = data.id || data['data.id'] || req.query.id;
 
-    // Validamos que sea un evento de pago
-    if (data.type === 'payment' && data.data && data.data.id) {
-      const paymentId = data.data.id;
+    if (!paymentId) {
+      console.error("❌ No llegó paymentId en webhook");
+      return res.status(400).json({ success: false, message: "Falta paymentId" });
+    }
 
-      // Llamamos a la API de MercadoPago para obtener info del pago
-      const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-        headers: {
-          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
-        }
+    // Llamada a Mercado Pago para obtener info del pago
+    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` }
+    });
+    const payment = await response.json();
+    console.log("✅ Detalles del pago:", payment);
+
+    if (payment.status === 'approved') {
+      const userId = payment.metadata?.userId;
+      if (!userId) return res.status(400).json({ success: false, message: "Falta userId" });
+
+      // Activar suscripción
+      const result = await database.activatePremiumSubscription(userId, {
+        payment_method: payment.payment_type_id,
+        preference_id: payment.metadata?.preference_id || null,
+        payment_id: payment.id,
+        amount: payment.transaction_amount,
+        currency: payment.currency_id,
+        status: payment.status,
+        approved_at: payment.date_approved
       });
 
-      const payment = await response.json();
-      console.log("✅ Detalles del pago:", payment);
-
-      if (payment.status === 'approved') {
-        const userId = payment.metadata?.userId;
-
-        if (!userId) {
-          console.error("❌ No llegó userId en metadata");
-          return res.status(400).json({ success: false, message: "Falta userId en metadata" });
-        }
-
-        // Guardamos la suscripción como activa en la DB
-        const result = await database.activatePremiumSubscription(userId, {
-          payment_method: payment.payment_type_id,
-          preference_id: payment.metadata?.preference_id || null,
-          payment_id: payment.id,
-          amount: payment.transaction_amount,
-          currency: payment.currency_id,
-          status: payment.status,
-          approved_at: payment.date_approved
-        });
-
-        console.log(`⭐ Usuario ${userId} activado como PREMIUM hasta ${result.endDate}`);
-      }
+      console.log(`⭐ Usuario ${userId} activado como PREMIUM hasta ${result.endDate}`);
     }
 
     res.status(200).json({ success: true });
@@ -199,7 +194,6 @@ router.post('/webhook', express.json(), async (req, res) => {
     res.status(500).json({ success: false });
   }
 });
-
 
 // 🧪 RUTA DE PRUEBA: Activar premium manualmente (SOLO DESARROLLO)
 router.post('/activate-manual', authenticateToken, async (req, res) => {
