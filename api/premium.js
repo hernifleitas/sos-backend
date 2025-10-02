@@ -177,8 +177,8 @@ router.post('/webhook', express.json(), async (req, res) => {
       // Activar suscripción
       const result = await database.activatePremiumSubscription(userId, {
         payment_method: payment.payment_type_id,
-        preference_id: payment.metadata?.preference_id || null,
-        payment_id: payment.id,
+        mercadopago_preference_id: payment.metadata?.preference_id || null,
+        mercadopago_payment_id: payment.id.toString(),
         amount: payment.transaction_amount,
         currency: payment.currency_id,
         status: payment.status,
