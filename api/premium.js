@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const database = require('../database');
 const jwt = require('jsonwebtoken');
-const fetch = require('node-fetch'); // Asegurate de tener node-fetch instalado
 
 // Middleware para verificar token JWT
 const authenticateToken = (req, res, next) => {
@@ -73,7 +72,6 @@ router.get('/subscriptions', authenticateToken, async (req, res) => {
 // Activar suscripción después del pago
 router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
   try {
-    // Convertir siempre a string para evitar errores por números grandes
     const paymentId = String(req.params.paymentId);
 
     const paymentData = {
@@ -98,12 +96,11 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
   }
 });
 
-// Crear nueva suscripción premium (para iniciar proceso de pago)
+// Crear nueva suscripción premium (Checkout Pro)
 router.post('/create-subscription', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Crear objeto preference para Checkout Pro
     const preference = {
       items: [
         { title: "Premium SOS", quantity: 1, unit_price: 5000 }
@@ -118,7 +115,7 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
       metadata: { userId }
     };
 
-    // Llamar a la API de MercadoPago
+    // Llamada a la API de MercadoPago
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
@@ -135,8 +132,8 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
       return res.status(500).json({ success: false, message: 'Error creando preferencia de pago' });
     }
 
-    // Generar mercadopago_payment_id provisional único para evitar duplicados
-    const provisionalPaymentId = `PENDING-${Date.now()}`;
+    // Generar ID provisional único para evitar duplicados
+    const provisionalPaymentId = `PENDING-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     // Guardar en DB la suscripción pendiente
     await database.createPremiumSubscription(userId, {
@@ -147,7 +144,6 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
       status: 'pending'
     });
 
-    // Devolver init_point al frontend
     res.json({ success: true, init_point: data.init_point, preferenceId: data.id });
 
   } catch (error) {
@@ -166,10 +162,8 @@ router.post('/webhook', express.json(), async (req, res) => {
       return res.status(400).json({ success: false, message: "Falta paymentId" });
     }
 
-    // Convertir siempre a string para evitar errores de números grandes
     const paymentId = String(paymentIdRaw);
 
-    // Llamada a Mercado Pago para obtener info del pago
     const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
       headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` }
     });
@@ -206,7 +200,6 @@ router.post('/activate-manual', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     
-    // Crear suscripción manual por 30 días
     const result = await database.activatePremiumSubscription(userId, {
       payment_method: 'manual',
       preference_id: 'MANUAL-' + Date.now(),
@@ -237,7 +230,6 @@ router.post('/activate-manual', authenticateToken, async (req, res) => {
 // Verificar estado premium por user ID (para admin)
 router.get('/status/:userId', authenticateToken, async (req, res) => {
   try {
-    // Verificar si el usuario es admin
     const isAdmin = await database.isAdmin(req.user.id);
     if (!isAdmin) {
       return res.status(403).json({

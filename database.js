@@ -286,21 +286,52 @@ async activatePremiumSubscription(userIdOrPaymentId, paymentData) {
     let subscription = null;
     let userId = null;
 
-    // Convertir todo a string para evitar problemas con IDs grandes
-    const searchPaymentId = String(userIdOrPaymentId);
+    // Convertir todo a string
+    const searchPaymentId = paymentData.mercadopago_payment_id
+      ? String(paymentData.mercadopago_payment_id)
+      : null;
 
-    // Buscar suscripción por paymentId
-    const subscriptionResult = await client.query(
-      'SELECT * FROM premium_subscriptions WHERE mercadopago_payment_id = $1',
-      [searchPaymentId]
+    // 1️⃣ Buscar suscripción pendiente por userId
+    const existingResult = await client.query(
+      `SELECT * FROM premium_subscriptions 
+       WHERE user_id = $1 AND status = 'pending'
+       ORDER BY created_at DESC LIMIT 1`,
+      [userIdOrPaymentId]
     );
 
-    if (subscriptionResult.rows.length > 0) {
-      subscription = subscriptionResult.rows[0];
+    if (existingResult.rows.length > 0) {
+      // Actualizar la suscripción pendiente con datos reales
+      subscription = existingResult.rows[0];
       userId = subscription.user_id;
+
+      await client.query(`
+        UPDATE premium_subscriptions
+        SET mercadopago_payment_id = $1,
+            mercadopago_preference_id = $2,
+            payment_method = $3,
+            amount = $4,
+            currency = $5,
+            status = $6,
+            start_date = NOW(),
+            end_date = NOW() + interval '30 days',
+            is_active = TRUE,
+            updated_at = NOW()
+        WHERE id = $7
+      `, [
+        searchPaymentId || `TMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        paymentData.mercadopago_preference_id ? String(paymentData.mercadopago_preference_id) : null,
+        paymentData.payment_method || 'manual',
+        paymentData.amount || 5000,
+        paymentData.currency || 'ARS',
+        paymentData.status || 'approved',
+        subscription.id
+      ]);
+
     } else {
-      // Si no existe, asumimos que es un userId y creamos suscripción
+      // No hay pendiente → crear nueva suscripción
       userId = userIdOrPaymentId;
+
+      const newPaymentId = searchPaymentId || `TMP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
       const insertResult = await client.query(`
         INSERT INTO premium_subscriptions (
@@ -311,14 +342,18 @@ async activatePremiumSubscription(userIdOrPaymentId, paymentData) {
           currency,
           status,
           payment_method,
-          is_active
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,TRUE)
+          start_date,
+          end_date,
+          is_active,
+          created_at,
+          updated_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW() + interval '30 days',TRUE,NOW(),NOW())
         RETURNING *
       `, [
         userId,
-        paymentData.mercadopago_payment_id ? String(paymentData.mercadopago_payment_id) : null,
+        newPaymentId,
         paymentData.mercadopago_preference_id ? String(paymentData.mercadopago_preference_id) : null,
-        paymentData.amount || 5000.00,
+        paymentData.amount || 5000,
         paymentData.currency || 'ARS',
         paymentData.status || 'approved',
         paymentData.payment_method || 'manual'
@@ -327,31 +362,8 @@ async activatePremiumSubscription(userIdOrPaymentId, paymentData) {
       subscription = insertResult.rows[0];
     }
 
-    // Fechas de suscripción
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 30);
-
-    // Actualizar suscripción
-    await client.query(`
-      UPDATE premium_subscriptions
-      SET status = $1,
-          payment_method = $2,
-          start_date = $3,
-          end_date = $4,
-          is_active = TRUE,
-          updated_at = NOW()
-      WHERE mercadopago_payment_id = $5 OR user_id = $6
-    `, [
-      paymentData.status || 'approved',
-      paymentData.payment_method || 'manual',
-      startDate,
-      endDate,
-      paymentData.mercadopago_payment_id ? String(paymentData.mercadopago_payment_id) : null,
-      userId
-    ]);
-
-    // Actualizar usuario
+    // Actualizar rol del usuario
+    const endDate = subscription.end_date || new Date(Date.now() + 30*24*60*60*1000);
     await client.query(`
       UPDATE users
       SET role = 'premium',
@@ -371,6 +383,7 @@ async activatePremiumSubscription(userIdOrPaymentId, paymentData) {
     client.release();
   }
 }
+
 
 
   
