@@ -107,11 +107,11 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
         { title: "Premium SOS", quantity: 1, unit_price: 5000 }
       ],
       back_urls: {
-        success: "https://unslated-daftly-dean.ngrok-free.dev/premium/success",
-        failure: "https://unslated-daftly-dean.ngrok-free.dev/premium/failure",
-        pending: "https://unslated-daftly-dean.ngrok-free.dev/premium/pending"
+        success: "https://sos-backend-8cpa.onrender.com/premium/success",
+        failure: "https://sos-backend-8cpa.onrender.com/premium/failure",
+        pending: "https://sos-backend-8cpa.onrender.com/premium/pending"
       },
-      notification_url: "https://unslated-daftly-dean.ngrok-free.dev/webhook",
+      notification_url: "https://sos-backend-8cpa.onrender.com/premium/webhook",
       auto_return: "approved",
       metadata: { userId }
     };
