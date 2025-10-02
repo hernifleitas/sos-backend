@@ -335,12 +335,6 @@ app.get("/alertas", (req, res) => {
 
 // Configuración de rutas API
 const API_PREFIX = '/api';
-
-console.log('chatRoutes', chatRoutes)
-console.log('authRoutes:', authRoutes);
-console.log('notificationsRoutes:', notificationsRoutes);
-console.log('premiumRoutes:', premiumRoutes);
-
 // Rutas de autenticación (sin prefijo para compatibilidad)
 app.use('/auth', authRoutes);
 
