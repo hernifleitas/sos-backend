@@ -241,137 +241,138 @@ class Database {
     })();
   }
 
-  async createPremiumSubscription(userId, mercadopagoData){
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-  
-      const {rows} = await client.query(`
+  async createPremiumSubscription(userId, mercadopagoData) {
+  const client = await this.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(`
+      INSERT INTO premium_subscriptions (
+        user_id,
+        mercadopago_payment_id,
+        mercadopago_preference_id,
+        amount,
+        currency,
+        status,
+        is_active
+      ) VALUES ($1,$2,$3,$4,$5,$6,FALSE)
+      RETURNING *
+    `, [
+      parseInt(userId, 10),
+      String(mercadopagoData.payment_id || ''),
+      String(mercadopagoData.preference_id || ''),
+      mercadopagoData.amount || 5000.00,
+      mercadopagoData.currency || 'ARS',
+      'pending'
+    ]);
+
+    await client.query('COMMIT');
+    return { success: true, subscription: rows[0] };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error creando suscripcion premium:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// DATABASE.JS - solo la función que cambia
+async activatePremiumSubscription(userIdOrPaymentId, paymentData) {
+  const client = await this.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    let subscription = null;
+    let userId = null;
+
+    // Convertir todo a string para evitar problemas con IDs grandes
+    const searchPaymentId = String(userIdOrPaymentId);
+
+    // Buscar suscripción por paymentId
+    const subscriptionResult = await client.query(
+      'SELECT * FROM premium_subscriptions WHERE mercadopago_payment_id = $1',
+      [searchPaymentId]
+    );
+
+    if (subscriptionResult.rows.length > 0) {
+      subscription = subscriptionResult.rows[0];
+      userId = subscription.user_id;
+    } else {
+      // Si no existe, asumimos que es un userId y creamos suscripción
+      userId = userIdOrPaymentId;
+
+      const insertResult = await client.query(`
         INSERT INTO premium_subscriptions (
           user_id,
           mercadopago_payment_id,
           mercadopago_preference_id,
           amount,
           currency,
-          status
-        ) VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, created_at
-      `,
-      [
-        userId,
-        String(mercadopagoData.payment_id || ''),
-        String(mercadopagoData.preference_id || ''),
-        mercadopagoData.amount || 5000.00,
-        mercadopagoData.currency || 'ARS',
-        'pending'
-      ]);
-  
-      await client.query('COMMIT');
-      return {success:true, subscription: rows[0]};
-    } catch (error){
-      await client.query('ROLLBACK');
-      console.error('Error creando suscripcion premium:', error);
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-  
-  async activatePremiumSubscription(userIdOrPaymentId, paymentData) {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-  
-      let subscription = null;
-      let userId = null;
-  
-      // Convertir todos los IDs a string para evitar overflow
-      const paymentIdStr = String(paymentData.mercadopago_payment_id || '');
-      const preferenceIdStr = String(paymentData.mercadopago_preference_id || '');
-      const searchPaymentId = String(userIdOrPaymentId);
-  
-      // Intentar buscar por mercadopago_payment_id primero
-      const subscriptionResult = await client.query(
-        'SELECT * FROM premium_subscriptions WHERE mercadopago_payment_id = $1',
-        [searchPaymentId]
-      );
-  
-      if (subscriptionResult.rows.length > 0) {
-        // Encontró suscripción existente por paymentId
-        subscription = subscriptionResult.rows[0];
-        userId = subscription.user_id;
-      } else {
-        // No encontró por paymentId, asumir que es userId y crear nueva suscripción
-        userId = userIdOrPaymentId;
-  
-        const insertResult = await client.query(`
-          INSERT INTO premium_subscriptions (
-            user_id,
-            mercadopago_payment_id,
-            mercadopago_preference_id,
-            amount,
-            currency,
-            status,
-            payment_method,
-            is_active
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
-          RETURNING *
-        `, [
-          userId,
-          paymentIdStr,
-          preferenceIdStr,
-          paymentData.amount || 5000.00,
-          paymentData.currency || 'ARS',
-          'approved',
-          paymentData.payment_method || 'manual'
-        ]);
-  
-        subscription = insertResult.rows[0];
-      }
-  
-      // Calcular fechas de suscripción
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 30);
-  
-      // Actualizar la suscripción con fechas y estado
-      await client.query(`
-        UPDATE premium_subscriptions
-        SET status = $1,
-            payment_method = $2,
-            start_date = $3,
-            end_date = $4,
-            is_active = TRUE,
-            updated_at = NOW()
-        WHERE mercadopago_payment_id = $5
+          status,
+          payment_method,
+          is_active
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,TRUE)
+        RETURNING *
       `, [
-        'approved',
-        paymentData.payment_method || 'manual',
-        startDate,
-        endDate,
-        paymentIdStr
+        userId,
+        paymentData.mercadopago_payment_id ? String(paymentData.mercadopago_payment_id) : null,
+        paymentData.mercadopago_preference_id ? String(paymentData.mercadopago_preference_id) : null,
+        paymentData.amount || 5000.00,
+        paymentData.currency || 'ARS',
+        paymentData.status || 'approved',
+        paymentData.payment_method || 'manual'
       ]);
-  
-      // Actualizar el usuario como premium
-      await client.query(`
-        UPDATE users
-        SET role = $1,
-            premium_expires_at = $2,
-            updated_at = NOW()
-        WHERE id = $3
-      `, ['premium', endDate, userId]);
-  
-      await client.query('COMMIT');
-      return { success: true, endDate, userId };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Error activando suscripción premium:', error);
-      throw error;
-    } finally {
-      client.release();
+
+      subscription = insertResult.rows[0];
     }
+
+    // Fechas de suscripción
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + 30);
+
+    // Actualizar suscripción
+    await client.query(`
+      UPDATE premium_subscriptions
+      SET status = $1,
+          payment_method = $2,
+          start_date = $3,
+          end_date = $4,
+          is_active = TRUE,
+          updated_at = NOW()
+      WHERE mercadopago_payment_id = $5 OR user_id = $6
+    `, [
+      paymentData.status || 'approved',
+      paymentData.payment_method || 'manual',
+      startDate,
+      endDate,
+      paymentData.mercadopago_payment_id ? String(paymentData.mercadopago_payment_id) : null,
+      userId
+    ]);
+
+    // Actualizar usuario
+    await client.query(`
+      UPDATE users
+      SET role = 'premium',
+          premium_expires_at = $1,
+          updated_at = NOW()
+      WHERE id = $2
+    `, [endDate, userId]);
+
+    await client.query('COMMIT');
+    return { success: true, endDate, userId };
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error activando suscripcion premium:', error);
+    throw error;
+  } finally {
+    client.release();
   }
-  
+}
+
+
   
   async isPremiumActive(userId) { 
     try {
