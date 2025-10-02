@@ -20,11 +20,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 
 //middleware de debugging 
-
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url} - ${new Date().toISOString()}`);
-  next();
-})
+//app.use((req, res, next) => {
+ // console.log(`${req.method} ${req.url} - ${new Date().toISOString()}`);
+  //next();
+//})
 
 // Servir archivos estáticos de premium
 app.use('/premium', express.static(path.join(__dirname, 'public/premium')));
@@ -346,10 +345,6 @@ app.use(`${API_PREFIX}/notifications`, notificationsRoutes);
 // Rutas de premium
 app.use(`${API_PREFIX}/premium`, premiumRoutes);
 
-//debug
-console.log('Rutas auth:', authRoutes.stack
-  .filter(r => r.route)
-  .map(r => r.route.path));
 // Middleware para verificar autenticación en rutas protegidas
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];

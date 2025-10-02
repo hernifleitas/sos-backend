@@ -72,11 +72,12 @@ router.get('/subscriptions', authenticateToken, async (req, res) => {
 // Activar suscripción después del pago
 router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
   try {
-    const { paymentId } = req.params;
+    const paymentId = req.params.paymentId.toString();
 
     const paymentData = {
       payment_method: 'mercadopago',
-      preference_id: req.body.preference_id || null
+      preference_id: req.body.preference_id || null,
+      mercadopago_payment_id: paymentId
     };
 
     const result = await database.activatePremiumSubscription(paymentId, paymentData);
@@ -152,16 +153,16 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
 // Webhook de MercadoPago
 router.post('/webhook', express.json(), async (req, res) => {
   try {
-    // Tomar datos de body o query params
-    const data = req.body.data || req.query;
 
-    // Obtener paymentId según cómo llegue
-    const paymentId = data.id || data['data.id'] || req.query.id;
+    const paymentIdRaw = req.body.id || req.body.data?.id || req.query.id;
 
-    if (!paymentId) {
+
+    if (!paymentIdRaw) {
       console.error("❌ No llegó paymentId en webhook");
       return res.status(400).json({ success: false, message: "Falta paymentId" });
     }
+
+    const paymentId = paymentIdRaw.toString();
 
     // Llamada a Mercado Pago para obtener info del pago
     const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
