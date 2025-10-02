@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const database = require('../database');
 const jwt = require('jsonwebtoken');
-const fetch = require('node-fetch'); // Asegurate de tener node-fetch instalado
 
 // Middleware para verificar token JWT
 const authenticateToken = (req, res, next) => {
