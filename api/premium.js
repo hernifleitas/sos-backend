@@ -92,8 +92,8 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
 
     // Activar suscripción en la DB
     const result = await database.activatePremiumSubscription(payment.metadata.userId, {
-      payment_method: payment.payment_type_id,
-      preference_id: payment.metadata.preference_id,
+      payment_method_id: payment.payment_type_id,
+      payment_type_id: payment.payment_type_id,
       payment_id: payment.id,
       amount: payment.transaction_amount,
       currency: payment.currency_id,
@@ -156,12 +156,14 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
     await database.savePaymentDetails({
       user_id: userId,
       payment_method: 'mercadopago',
-      preference_id: data.id,
+      preference_id: data.id, // ESTE ES EL preference_id de MercadoPago
       amount: 5000,
       currency: 'ARS',
-      subscription_id: null, 
-      payment_id: null
+      subscription_id: null,
+      payment_id: null, // Aún no aprobado
+      status: 'pending'
     });
+    
 
     // 4️⃣ Devolver init_point al frontend
     res.json({ success: true, init_point: data.init_point, preferenceId: data.id });
@@ -199,9 +201,9 @@ router.post('/webhook', express.json(), async (req, res) => {
       if (!pendingPayment) return res.status(404).json({ success: false, message: "Pago pendiente no encontrado" });  
 
       // Activar suscripción
-      const result = await database.activatePremiumSubscription(userId, {
-       payment_method: payment.payment_type_id,
-        preferenceId,
+      const result = await database.activatePremiumSubscription(pendingPayment.id, {
+        payment_method: payment.payment_type_id,
+        payment_type_id: payment.payment_type_id,
         payment_id: payment.id,
         amount: payment.transaction_amount,
         currency: payment.currency_id,
