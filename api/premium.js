@@ -174,11 +174,8 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
 // Webhook de MercadoPago
 router.post('/webhook', express.json(), async (req, res) => {
   try {
-    // Tomar datos de body o query params
-    const data = req.body.data || req.query;
-
-    // Obtener paymentId según cómo llegue
-    const paymentId = data.id || data['data.id'] || req.query.id;
+    console.log("📩 Webhook recibido:", JSON.stringify(req.body, null, 2));
+    const paymentId = req.body?.data?.id;
 
     if (!paymentId) {
       console.error("❌ No llegó paymentId en webhook");
@@ -196,6 +193,15 @@ router.post('/webhook', express.json(), async (req, res) => {
       const userId = payment.metadata?.userId;
       if (!userId) return res.status(400).json({ success: false, message: "Falta userId" });
 
+      console.log("✅ Activando suscripción para usuario:", userId);
+      console.log("✅ Detalles del pago:", payment);
+      await pool.query(
+        `UPDATE payments
+         SET payment_id = $1,
+             status = $2
+         WHERE preference_id = $3 AND user_id = $4`,
+        [payment.id, payment.status, payment.metadata?.preference_id, userId]
+      );
       // Activar suscripción
       const result = await database.activatePremiumSubscription(userId, {
         payment_method: payment.payment_type_id,
