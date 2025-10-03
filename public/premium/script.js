@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error('Error verificando estado premium:', error);
         }
     }
+    
 
     // Manejar clic en el botón de activar premium
     async function handleActivatePremium() {

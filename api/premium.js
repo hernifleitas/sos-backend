@@ -114,7 +114,6 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
 });
 
 // Crear nueva suscripción premium (para iniciar proceso de pago) - Checkout Pro
-// Crear nueva suscripción premium (Checkout Pro)
 router.post('/create-subscription', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;

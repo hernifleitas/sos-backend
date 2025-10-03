@@ -294,12 +294,14 @@ WHERE is_active = true;
             updated_at = NOW() 
         WHERE user_id = $1
       `, [userId]);
+  
+      // 3. Crear nueva suscripción
       await client.query(`
         INSERT INTO premium_subscriptions 
-          (user_id, start_date, end_date, is_active, payment_id)
+          (user_id, start_date, end_date, is_active)
         VALUES 
-          ($1, NOW(), $2, true, $3)
-      `, [userId, endDate, paymentId]);
+          ($1, NOW(), $2, true)
+      `, [userId, endDate]);
   
       await client.query('COMMIT');
       
@@ -420,8 +422,9 @@ WHERE is_active = true;
       await client.query('BEGIN');
       const paymentResult = await client.query(
         `SELECT * FROM payments 
-         WHERE payment_id = $1 AND status = $2`,
-        [String(paymentId), 'pending']
+         WHERE (id = $1 OR payment_id = $2) 
+         AND status = $3`,
+        [parseInt(paymentId, 10), String(paymentId), 'pending']
       );
   
       if (paymentResult.rows.length === 0) {
@@ -530,23 +533,6 @@ WHERE is_active = true;
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Error en savePaymentDetails:', error);
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  async findPendingPaymentByPreference(preference_id, user_id) {
-    const client = await this.pool.connect();
-    try {
-      const { rows } = await client.query(
-        `SELECT * FROM payments 
-         WHERE preference_id = $1 AND user_id = $2 AND status = 'pending'`,
-        [preference_id, user_id]
-      );
-      return rows[0] || null;
-    } catch (error) {
-      console.error('Error en findPendingPaymentByPreference:', error);
       throw error;
     } finally {
       client.release();
