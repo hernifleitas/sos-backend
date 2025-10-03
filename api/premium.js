@@ -155,16 +155,32 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
 // Webhook de MercadoPago
 router.post('/webhook', express.json(), async (req, res) => {
   try {
-    // Tomar datos de body o query params
-    const data = req.body.data || req.query;
-
-    // Obtener paymentId según cómo llegue
-    const paymentId = data.id || data['data.id'] || req.query.id;
+    // 1. Obtener datos de la notificación
+    const data = req.body;
+    
+    // 2. Manejar diferentes formatos de notificación de MercadoPago
+    let paymentId;
+    
+    // Si es una notificación de pago directa
+    if (data.id) {
+      paymentId = data.id;
+    } 
+    // Si es una notificación de webhook (data contiene el ID del pago)
+    else if (data.data && data.data.id) {
+      paymentId = data.data.id;
+    }
+    // Si viene como query param (para pruebas)
+    else if (req.query.id) {
+      paymentId = req.query.id;
+    }
 
     if (!paymentId) {
-      console.error("❌ No llegó paymentId en webhook");
-      return res.status(400).json({ success: false, message: "Falta paymentId" });
+      console.error("❌ No se pudo obtener el ID de pago de la notificación");
+      console.log("Datos recibidos:", JSON.stringify(req.body, null, 2));
+      return res.status(400).json({ success: false, message: "ID de pago no proporcionado" });
     }
+
+    console.log(`🔔 Notificación recibida para pago: ${paymentId}`);
 
     // Llamada a Mercado Pago para obtener info del pago
     const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {

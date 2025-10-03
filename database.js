@@ -271,38 +271,44 @@ WHERE is_active = true;
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-
+  
       // Calcular fecha de expiración
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + months);
-
-      // 1. Desactivar cualquier suscripción activa existente
-      await client.query(
-        'UPDATE premium_subscriptions SET is_active = false, updated_at = NOW() WHERE user_id = $1 AND is_active = true',
-        [userId]
-      );
-
-      // 2. Crear nueva suscripción
-      const result = await client.query(
-        `INSERT INTO premium_subscriptions 
-       (user_id, start_date, end_date, is_active) 
-       VALUES ($1, NOW(), $2, true)
-       RETURNING id, end_date`,
-        [userId, endDate]
-      );
-
-      // 3. Actualizar el usuario
-      await client.query(
-        'UPDATE users SET is_premium = true, premium_expires_at = $1, updated_at = NOW() WHERE id = $2',
-        [endDate, userId]
-      );
-
+  
+      // 1. Actualizar el usuario
+      await client.query(`
+        UPDATE users 
+        SET 
+          role = 'premium',
+          is_premium = true,
+          premium_expires_at = $1,
+          updated_at = NOW()
+        WHERE id = $2
+      `, [endDate, userId]);
+  
+      // 2. Desactivar suscripciones anteriores
+      await client.query(`
+        UPDATE premium_subscriptions 
+        SET is_active = false, 
+            updated_at = NOW() 
+        WHERE user_id = $1
+      `, [userId]);
+  
+      // 3. Crear nueva suscripción
+      await client.query(`
+        INSERT INTO premium_subscriptions 
+          (user_id, start_date, end_date, is_active)
+        VALUES 
+          ($1, NOW(), $2, true)
+      `, [userId, endDate]);
+  
       await client.query('COMMIT');
-
-      return {
-        success: true,
-        subscription: result.rows[0],
-        message: 'Suscripción premium activada correctamente'
+      
+      return { 
+        success: true, 
+        message: 'Usuario actualizado a premium exitosamente',
+        expiresAt: endDate
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -415,19 +421,20 @@ WHERE is_active = true;
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-
+  
       // 1. Obtener los detalles del pago
       const paymentResult = await client.query(
-        'SELECT * FROM payments WHERE id = $1 AND status = $2',
+        'SELECT * FROM payments WHERE (id = $1 OR payment_id = $1) AND status = $2',
         [paymentId, 'pending']
       );
-
+  
       if (paymentResult.rows.length === 0) {
         throw new Error('Pago no encontrado o ya procesado');
       }
-
+  
       const payment = paymentResult.rows[0];
       const userId = payment.user_id;
+  
 
       // 2. Calcular fechas de inicio y fin
       const startDate = new Date();
@@ -503,9 +510,9 @@ WHERE is_active = true;
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-
-      const { user_id, preference_id, amount, currency, subscription_id } = paymentData;
-
+  
+      const { user_id, preference_id, amount, currency, subscription_id, payment_id } = paymentData;
+  
       const result = await client.query(
         `INSERT INTO payments (
           user_id, 
@@ -514,13 +521,14 @@ WHERE is_active = true;
           currency, 
           subscription_id,
           status,
+          payment_id,  // Añadimos el payment_id de MercadoPago
           created_at,
           updated_at
-        ) VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())
+        ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW(), NOW())
         RETURNING id`,
-        [user_id, preference_id, amount, currency, subscription_id]
+        [user_id, preference_id, amount, currency, subscription_id, payment_id]
       );
-
+  
       await client.query('COMMIT');
       return result.rows[0];
     } catch (error) {
@@ -531,6 +539,7 @@ WHERE is_active = true;
       client.release();
     }
   }
+  
 
   // =================== CHAT ===================
   addMessage(userId, content, room = 'global') {
