@@ -32,7 +32,7 @@ const authenticateToken = (req, res, next) => {
 router.get('/status', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const premiumStatus = await database.isPremiumActive(userId);
+    const premiumStatus = await database.isPremium(userId);
     
     res.json({
       success: true,
@@ -241,7 +241,7 @@ router.get('/status/:userId', authenticateToken, async (req, res) => {
     }
     
     const { userId } = req.params;
-    const premiumStatus = await database.isPremiumActive(userId);
+    const premiumStatus = await database.isPremium(userId);
     
     res.json({
       success: true,
