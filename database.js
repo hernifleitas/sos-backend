@@ -416,133 +416,91 @@ WHERE is_active = true;
     }
   }
   
-  async activatePremiumSubscription(paymentId, paymentData) {
+  async activatePremiumSubscription(userId, paymentData) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
   
-      // Buscar pago pendiente por payment_id (TEXT)
-      const paymentResult = await client.query(
-        `SELECT * FROM payments 
-         WHERE payment_id = $1 
-         AND status = $2`,
-        [String(paymentId), 'pending']
-      );
-  
-      if (paymentResult.rows.length === 0) {
-        throw new Error('Pago no encontrado o ya procesado');
+      // 1. Validar datos de entrada
+      const requiredFields = ['payment_id', 'preference_id', 'status', 'payment_method', 'payment_type_id'];
+      const missingFields = requiredFields.filter(field => !paymentData[field]);
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Faltan campos requeridos: ${missingFields.join(', ')}`);
       }
   
-      const payment = paymentResult.rows[0];
-      const userId = payment.user_id;
-  
-      // Calcular fechas de inicio y fin
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setMonth(endDate.getMonth() + 1); // 1 mes de suscripción
-  
-      // Desactivar suscripciones anteriores
-      await client.query(
-        `UPDATE premium_subscriptions 
-         SET is_active = false, updated_at = NOW() 
-         WHERE user_id = $1`,
-        [userId]
+      // 2. Verificar si el pago ya fue procesado
+      const paymentCheck = await client.query(
+        'SELECT id FROM payments WHERE payment_id = $1 AND status = $2',
+        [paymentData.payment_id, 'approved']
       );
   
-      // Crear nueva suscripción premium
-      const subscriptionResult = await client.query(
-        `INSERT INTO premium_subscriptions 
-         (user_id, start_date, end_date, is_active, payment_id)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, end_date`,
-        [userId, startDate, endDate, true, String(paymentId)]
-      );
+      if (paymentCheck.rows.length > 0) {
+        throw new Error('Pago ya procesado anteriormente');
+      }
   
-      // Actualizar estado del pago
-      await client.query(
+      // 3. Actualizar el pago
+      const updatePayment = await client.query(
         `UPDATE payments 
-         SET status = 'completed',
-             payment_method_id = $1,
-             payment_type_id = $2,
+         SET status = $1, 
+             payment_method_id = $2,
+             payment_type_id = $3,
              updated_at = NOW()
-         WHERE payment_id = $3`,
-        [paymentData.payment_method_id, paymentData.payment_type_id, String(paymentId)]
+         WHERE preference_id = $4 
+         RETURNING id`,
+        [
+          paymentData.status,
+          paymentData.payment_method,
+          paymentData.payment_type_id,
+          paymentData.preference_id
+        ]
       );
   
-      // Actualizar estado premium del usuario
+      if (updatePayment.rows.length === 0) {
+        throw new Error('No se encontró el pago con el preference_id proporcionado');
+      }
+  
+      // 4. Calcular fecha de expiración (1 mes después)
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 1);
+      const endDateISO = endDate.toISOString();
+  
+      // 5. Actualizar usuario a premium
       await client.query(
         `UPDATE users 
-         SET is_premium = true,
+         SET role = 'premium',
+             is_premium = true,
              premium_expires_at = $1,
              updated_at = NOW()
          WHERE id = $2`,
-        [endDate, userId]
+        [endDateISO, userId]
+      );
+  
+      // 6. Crear registro de suscripción
+      await client.query(
+        `INSERT INTO premium_subscriptions 
+         (user_id, start_date, end_date, is_active, payment_id)
+         VALUES ($1, NOW(), $2, true, $3)`,
+        [userId, endDateISO, paymentData.payment_id]
       );
   
       await client.query('COMMIT');
-  
-      return {
-        success: true,
-        endDate: endDate.toISOString()
-      };
+      
+      console.log(`✅ Suscripción premium activada para usuario ${userId} hasta ${endDateISO}`);
+      return { success: true, endDate: endDateISO };
   
     } catch (error) {
       await client.query('ROLLBACK');
-      console.error('Error en activatePremiumSubscription:', error);
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  async getUserSubscriptions(userId) {
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(
-        `SELECT ps.*, p.amount, p.currency, p.status as payment_status, p.created_at as payment_date
-         FROM premium_subscriptions ps
-         LEFT JOIN payments p ON p.id = ps.payment_id
-         WHERE ps.user_id = $1
-         ORDER BY ps.start_date DESC`,
-        [userId]
-      );
-      return result.rows;
-    } catch (error) {
-      console.error('Error en getUserSubscriptions:', error);
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  async savePaymentDetails(paymentData) {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-  
-      const { user_id, preference_id, amount, currency, subscription_id, payment_id } = paymentData;
-  
-      const result = await client.query(
-        `INSERT INTO payments (
-          user_id, 
-          preference_id, 
-          amount, 
-          currency, 
-          subscription_id,
-          status,
-          payment_id,
-          created_at,
-          updated_at
-        ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW(), NOW())
-        RETURNING id`,
-        [user_id, preference_id, amount, currency, subscription_id, payment_id]
-      );
-  
-      await client.query('COMMIT');
-      return result.rows[0];
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Error en savePaymentDetails:', error);
+      console.error('❌ Error en activatePremiumSubscription:', {
+        error: error.message,
+        userId,
+        paymentData: {
+          ...paymentData,
+          // Ocultar datos sensibles en logs
+          payment_id: paymentData?.payment_id ? '***' : undefined,
+          preference_id: paymentData?.preference_id ? '***' : undefined
+        }
+      });
       throw error;
     } finally {
       client.release();

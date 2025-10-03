@@ -195,11 +195,13 @@ router.post('/webhook', express.json(), async (req, res) => {
 
       console.log("✅ Activando suscripción para usuario:", userId);
       console.log("✅ Detalles del pago:", payment);
-      await pool.query(
+      await database.pool.query(
         `UPDATE payments
          SET payment_id = $1,
-             status = $2
-         WHERE preference_id = $3 AND user_id = $4`,
+             status = $2,
+             updated_at = NOW()
+         WHERE preference_id = $3 AND user_id = $4
+         RETURNING *`,
         [payment.id, payment.status, payment.metadata?.preference_id, userId]
       );
       // Activar suscripción
