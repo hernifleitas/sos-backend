@@ -521,7 +521,7 @@ WHERE is_active = true;
           currency, 
           subscription_id,
           status,
-          payment_id,  // Añadimos el payment_id de MercadoPago
+          payment_id,
           created_at,
           updated_at
         ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW(), NOW())
