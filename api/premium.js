@@ -113,6 +113,7 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
   }
 });
 
+// Crear nueva suscripción premium (para iniciar proceso de pago) - Checkout Pro
 // Crear nueva suscripción premium (Checkout Pro)
 router.post('/create-subscription', authenticateToken, async (req, res) => {
   try {
@@ -128,7 +129,7 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
         failure: `https://sos-backend-8cpa.onrender.com/premium/failure`,
         pending: `https://sos-backend-8cpa.onrender.com/premium/pending`
       },
-      notification_url: `https://sos-backend-8cpa.onrender.com/premium/webhook`,
+      notification_url: `https://sos-backend-8cpa.onrender.com//premium/webhook`,
       auto_return: "approved",
       metadata: { userId }
     };
@@ -158,7 +159,7 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
       preference_id: data.id,
       amount: 5000,
       currency: 'ARS',
-      subscription_id: null, // si no tenés todavía la subscripción
+      subscription_id: null, 
       payment_id: null
     });
 
@@ -174,8 +175,8 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
 // Webhook de MercadoPago
 router.post('/webhook', express.json(), async (req, res) => {
   try {
-    console.log("📩 Webhook recibido:", JSON.stringify(req.body, null, 2));
-    const paymentId = req.body?.data?.id;
+    const data = req.body.data || req.query;
+    const paymentId = data.id || data['data.id'] || req.query.id;
 
     if (!paymentId) {
       console.error("❌ No llegó paymentId en webhook");
@@ -191,23 +192,16 @@ router.post('/webhook', express.json(), async (req, res) => {
 
     if (payment.status === 'approved') {
       const userId = payment.metadata?.userId;
-      if (!userId) return res.status(400).json({ success: false, message: "Falta userId" });
+      const preferenceId = payment.metadata?.preference_id;
+      if (!userId || !preferenceId) return res.status(400).json({ success: false, message: "Falta userId o preferenceId" });
 
-      console.log("✅ Activando suscripción para usuario:", userId);
-      console.log("✅ Detalles del pago:", payment);
-      await database.pool.query(
-        `UPDATE payments
-         SET payment_id = $1,
-             status = $2,
-             updated_at = NOW()
-         WHERE preference_id = $3 AND user_id = $4
-         RETURNING *`,
-        [payment.id, payment.status, payment.metadata?.preference_id, userId]
-      );
+      const pendingPayment = await database.findPendingPaymentByPreference(preferenceId, userId);
+      if (!pendingPayment) return res.status(404).json({ success: false, message: "Pago pendiente no encontrado" });  
+
       // Activar suscripción
       const result = await database.activatePremiumSubscription(userId, {
-        payment_method: payment.payment_type_id,
-        preference_id: payment.metadata?.preference_id || null,
+       payment_method: payment.payment_type_id,
+        preferenceId,
         payment_id: payment.id,
         amount: payment.transaction_amount,
         currency: payment.currency_id,
