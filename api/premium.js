@@ -95,7 +95,6 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
   }
 });
 
-// Crear nueva suscripción premium (para iniciar proceso de pago)
 // Crear nueva suscripción premium (para iniciar proceso de pago) - Checkout Pro
 router.post('/create-subscription', authenticateToken, async (req, res) => {
   try {
@@ -134,13 +133,17 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
     }
 
     // 3️⃣ Guardar en DB la suscripción pendiente
-    await database.createPremiumSubscription(userId, {
+    const subscription = await database.makePremium(userId, 1); // month
+
+    // Guardar detalles del pago si es necesario
+    await database.savePaymentDetails({
+      user_id: userId,
       preference_id: data.id,
       amount: 5000,
-      currency: 'ARS'
+      currency: 'ARS',
+      subscription_id: subscription.id 
     });
-
-    // 4️⃣ Devolver init_point al frontend
+    
     res.json({ success: true, init_point: data.init_point, preferenceId: data.id });
 
   } catch (error) {

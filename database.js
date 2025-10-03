@@ -83,7 +83,23 @@ class Database {
         );
       `);
 
-      // Trigger para updated_at en device_tokens
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS payments (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          preference_id TEXT NOT NULL,
+          amount DECIMAL(10, 2) NOT NULL,
+          currency VARCHAR(3) NOT NULL,
+          subscription_id INTEGER REFERENCES premium_subscriptions(id) ON DELETE SET NULL,
+          status VARCHAR(20) DEFAULT 'pending',
+          payment_method_id TEXT,
+          payment_type_id TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW(),
+          UNIQUE(preference_id)
+        );
+      `);
+
       await client.query(`
         CREATE OR REPLACE FUNCTION set_updated_at()
         RETURNS TRIGGER AS $$
@@ -93,6 +109,21 @@ class Database {
         END;
         $$ LANGUAGE plpgsql;
       `);
+      // Crear triggers para updated_at
+      const triggers = [
+        { table: 'device_tokens', name: 'device_tokens_set_updated_at' },
+        { table: 'payments', name: 'payments_set_updated_at' }
+      ];
+
+      for (const trigger of triggers) {
+        await client.query(`
+          DROP TRIGGER IF EXISTS ${trigger.name} ON ${trigger.table};
+          CREATE TRIGGER ${trigger.name}
+          BEFORE UPDATE ON ${trigger.table}
+          FOR EACH ROW
+          EXECUTE FUNCTION set_updated_at();
+        `);
+      }
 
       await client.query(`
         DO $$ BEGIN
@@ -236,25 +267,33 @@ class Database {
     })();
   }
 
-  async makePremium(userId, days = 30) {
+  async makePremium(userId, months = 1) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       
-      // Calcular fecha de expiración
+      // Calcular fecha de expiración (ahora usa meses en lugar de días)
       const endDate = new Date();
-      endDate.setDate(endDate.getDate() + days);
+      endDate.setMonth(endDate.getMonth() + months);
       
-      // Actualizar rol del usuario
+      // Actualizar rol del usuario y fecha de expiración
       await client.query(
         'UPDATE users SET role = $1, premium_expires_at = $2, updated_at = NOW() WHERE id = $3', 
         ['premium', endDate, userId]
       );
       
-      // Registrar la suscripción
+      // Registrar o actualizar la suscripción en premium_subscriptions
       await client.query(
-        `INSERT INTO premium_subscriptions (user_id, start_date, end_date) 
-         VALUES ($1, NOW(), $2) RETURNING id`,
+        `INSERT INTO premium_subscriptions 
+         (user_id, start_date, end_date, is_active) 
+         VALUES ($1, NOW(), $2, TRUE)
+         ON CONFLICT (user_id) 
+         DO UPDATE SET 
+           start_date = NOW(),
+           end_date = $2,
+           is_active = TRUE,
+           updated_at = NOW()
+         RETURNING id`,
         [userId, endDate]
       );
       
@@ -361,6 +400,128 @@ class Database {
     } catch (error) {
       console.error('Error en isPremium:', error);
       return false;
+    } finally {
+      client.release();
+    }
+  }
+
+
+  async activatePremiumSubscription(paymentId, paymentData) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+  
+      // 1. Obtener los detalles del pago
+      const paymentResult = await client.query(
+        'SELECT * FROM payments WHERE id = $1 AND status = $2',
+        [paymentId, 'pending']
+      );
+  
+      if (paymentResult.rows.length === 0) {
+        throw new Error('Pago no encontrado o ya procesado');
+      }
+  
+      const payment = paymentResult.rows[0];
+      const userId = payment.user_id;
+  
+      // 2. Calcular fechas de inicio y fin
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 1); // 1 mes de suscripción
+  
+      // 3. Crear la suscripción premium
+      const subscriptionResult = await client.query(
+        `INSERT INTO premium_subscriptions 
+         (user_id, start_date, end_date, is_active, payment_id)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, end_date`,
+        [userId, startDate, endDate, true, paymentId]
+      );
+  
+      // 4. Actualizar el estado del pago
+      await client.query(
+        `UPDATE payments 
+         SET status = 'completed', 
+             payment_method = $1,
+             payment_type = $2,
+             updated_at = NOW()
+         WHERE id = $3`,
+        [paymentData.payment_method, paymentData.payment_type, paymentId]
+      );
+  
+      // 5. Actualizar el estado premium del usuario
+      await client.query(
+        `UPDATE users 
+         SET is_premium = true, 
+             premium_expires_at = $1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [endDate, userId]
+      );
+  
+      await client.query('COMMIT');
+      return { 
+        success: true, 
+        endDate: endDate.toISOString() 
+      };
+  
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error en activatePremiumSubscription:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  
+  async getUserSubscriptions(userId) {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        `SELECT ps.*, p.amount, p.currency, p.status as payment_status, p.created_at as payment_date
+         FROM premium_subscriptions ps
+         LEFT JOIN payments p ON p.id = ps.payment_id
+         WHERE ps.user_id = $1
+         ORDER BY ps.start_date DESC`,
+        [userId]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('Error en getUserSubscriptions:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  
+  async savePaymentDetails(paymentData) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      const { user_id, preference_id, amount, currency, subscription_id } = paymentData;
+      
+      const result = await client.query(
+        `INSERT INTO payments (
+          user_id, 
+          preference_id, 
+          amount, 
+          currency, 
+          subscription_id,
+          status,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())
+        RETURNING id`,
+        [user_id, preference_id, amount, currency, subscription_id]
+      );
+      
+      await client.query('COMMIT');
+      return result.rows[0];
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error en savePaymentDetails:', error);
+      throw error;
     } finally {
       client.release();
     }
