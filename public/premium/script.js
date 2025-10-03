@@ -97,30 +97,15 @@ document.addEventListener('DOMContentLoaded', function () {
     async function handleMPRedirect() {
         const urlParams = new URLSearchParams(window.location.search);
         const status = urlParams.get('status');
-        const paymentId = urlParams.get('payment_id');
-
-        if (status === 'approved' && paymentId) {
+    
+        if (status === 'approved') {
             setLoading(true);
-            try {
-                const res = await fetch(`/api/premium/activate/${paymentId}`, {
-                    method: 'POST',
-                    headers: headers
-                });
-                const data = await res.json();
-                if (data.success) {
-                    showMessage('¡Pago exitoso! Tu cuenta ha sido actualizada a Premium.');
-                    checkPremiumStatus();
-                } else {
-                    showMessage('Pago aprobado pero hubo un error activando tu cuenta.', true);
-                }
-            } catch (err) {
-                console.error(err);
-                showMessage('Error activando tu cuenta premium.', true);
-            } finally {
-                setLoading(false);
-                // Limpiar query params para que no se repita al refrescar
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
+            showMessage('¡Pago exitoso! Tu cuenta se activará automáticamente.');
+            await checkPremiumStatus(); // refresca estado del usuario
+            setLoading(false);
+    
+            // Limpiar query params para que no se repita al refrescar
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
     }
 

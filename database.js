@@ -415,17 +415,18 @@ WHERE is_active = true;
       client.release();
     }
   }
-
-
+  
   async activatePremiumSubscription(paymentId, paymentData) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
   
-      // 1. Obtener los detalles del pago
+      // Buscar pago pendiente por payment_id (TEXT)
       const paymentResult = await client.query(
-        'SELECT * FROM payments WHERE (id = $1 OR payment_id = $1) AND status = $2',
-        [paymentId, 'pending']
+        `SELECT * FROM payments 
+         WHERE payment_id = $1 
+         AND status = $2`,
+        [String(paymentId), 'pending']
       );
   
       if (paymentResult.rows.length === 0) {
@@ -435,48 +436,56 @@ WHERE is_active = true;
       const payment = paymentResult.rows[0];
       const userId = payment.user_id;
   
-
-      // 2. Calcular fechas de inicio y fin
+      // Calcular fechas de inicio y fin
       const startDate = new Date();
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + 1); // 1 mes de suscripción
-
-      // 3. Crear la suscripción premium
+  
+      // Desactivar suscripciones anteriores
+      await client.query(
+        `UPDATE premium_subscriptions 
+         SET is_active = false, updated_at = NOW() 
+         WHERE user_id = $1`,
+        [userId]
+      );
+  
+      // Crear nueva suscripción premium
       const subscriptionResult = await client.query(
         `INSERT INTO premium_subscriptions 
          (user_id, start_date, end_date, is_active, payment_id)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, end_date`,
-        [userId, startDate, endDate, true, paymentId]
+        [userId, startDate, endDate, true, String(paymentId)]
       );
-
-      // 4. Actualizar el estado del pago
+  
+      // Actualizar estado del pago
       await client.query(
         `UPDATE payments 
-         SET status = 'completed', 
-             payment_method = $1,
-             payment_type = $2,
+         SET status = 'completed',
+             payment_method_id = $1,
+             payment_type_id = $2,
              updated_at = NOW()
-         WHERE id = $3`,
-        [paymentData.payment_method, paymentData.payment_type, paymentId]
+         WHERE payment_id = $3`,
+        [paymentData.payment_method_id, paymentData.payment_type_id, String(paymentId)]
       );
-
-      // 5. Actualizar el estado premium del usuario
+  
+      // Actualizar estado premium del usuario
       await client.query(
         `UPDATE users 
-         SET is_premium = true, 
+         SET is_premium = true,
              premium_expires_at = $1,
              updated_at = NOW()
          WHERE id = $2`,
         [endDate, userId]
       );
-
+  
       await client.query('COMMIT');
+  
       return {
         success: true,
         endDate: endDate.toISOString()
       };
-
+  
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Error en activatePremiumSubscription:', error);
