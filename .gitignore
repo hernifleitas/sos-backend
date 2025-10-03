@@ -1,5 +1,5 @@
 .vercel
 .env
-.env.local
-.env.example
 node_modules
+android/
+ios/

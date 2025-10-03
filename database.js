@@ -548,6 +548,14 @@ WHERE is_active = true;
       client.release();
     }
   }
+
+  async findPaymentById(paymentId, userId) {
+    const result = await this.pool.query(
+      `SELECT * FROM payments WHERE id = $1 AND user_id = $2`,
+      [paymentId, userId]
+    );
+    return result.rows[0];
+  }
   
 
   // =================== CHAT ===================
