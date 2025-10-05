@@ -224,31 +224,80 @@ router.post('/webhook', express.json(), async (req, res) => {
 router.post('/activate-manual', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    
-    // Crear suscripción manual por 30 días
-    const result = await database.activatePremiumSubscription(userId, {
-      payment_method: 'manual',
-      preference_id: 'MANUAL-' + Date.now(),
-      payment_id: 'MANUAL-PAYMENT-' + Date.now(),
-      amount: 5000,
-      currency: 'ARS',
-      status: 'approved',
-      approved_at: new Date().toISOString()
-    });
+    const { months = 1 } = req.body; // Opcional: meses de suscripción
 
-    console.log(`✅ Usuario ${userId} activado como PREMIUM manualmente hasta ${result.endDate}`);
+    // Calcular fechas
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + months);
 
-    res.json({
-      success: true,
-      message: '¡Premium activado manualmente!',
-      expiresAt: result.endDate,
-      isPremium: true
-    });
+    const client = await database.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Actualizar usuario a premium
+      await client.query(`
+        UPDATE users 
+        SET role = 'premium',
+            is_premium = true,
+            premium_expires_at = $1,
+            updated_at = NOW()
+        WHERE id = $2
+      `, [endDate, userId]);
+
+      // 2. Crear registro de pago simulado
+      const paymentResult = await client.query(`
+        INSERT INTO payments (
+          user_id, 
+          preference_id, 
+          payment_id,
+          amount,
+          currency,
+          status,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+        RETURNING id
+      `, [
+        userId,
+        'MANUAL-' + Date.now(),
+        'MANUAL-PAY-' + Date.now(),
+        5000, // Monto fijo
+        'ARS',
+        'approved'
+      ]);
+
+      // 3. Crear suscripción
+      await client.query(`
+        INSERT INTO premium_subscriptions (
+          user_id, 
+          start_date, 
+          end_date, 
+          is_active,
+          payment_id
+        ) VALUES ($1, $2, $3, true, $4)
+      `, [userId, startDate, endDate, paymentResult.rows[0].id]);
+
+      await client.query('COMMIT');
+
+      res.json({
+        success: true,
+        message: '¡Premium activado manualmente!',
+        expiresAt: endDate
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
   } catch (error) {
-    console.error('Error activando premium manual:', error);
+    console.error('Error en activate-manual:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Error interno del servidor'
+      message: 'Error al activar premium'
     });
   }
 });
