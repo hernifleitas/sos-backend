@@ -128,7 +128,7 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
         failure: `https://sos-backend-8cpa.onrender.com/premium/failure`,
         pending: `https://sos-backend-8cpa.onrender.com/premium/pending`
       },
-      notification_url: `https://sos-backend-8cpa.onrender.com//premium/webhook`,
+      notification_url: `https://sos-backend-8cpa.onrender.com/premium/webhook`,
       auto_return: "approved",
       metadata: { userId }
     };
@@ -155,11 +155,11 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
     await database.savePaymentDetails({
       user_id: userId,
       payment_method: 'mercadopago',
-      preference_id: data.id, // ESTE ES EL preference_id de MercadoPago
+      preference_id: data.id, 
       amount: 5000,
       currency: 'ARS',
       subscription_id: null,
-      payment_id: null, // Aún no aprobado
+      payment_id: null, 
       status: 'pending'
     });
     
