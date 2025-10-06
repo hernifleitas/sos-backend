@@ -481,8 +481,8 @@ WHERE is_active = true;
         
         const subscriptionCheck = await client.query(
           `SELECT * FROM premium_subscriptions 
-           WHERE payment_id = $1 AND is_active = true`,
-          [payment.id]
+           WHERE mercadopago_payment_id = $1 AND is_active = true`,
+          [payment.mercadopago_payment_id || paymentId]
         );
       
         if (subscriptionCheck.rows.length > 0) {
