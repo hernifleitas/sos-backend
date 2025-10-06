@@ -383,44 +383,51 @@ WHERE is_active = true;
   async isPremium(userId) {
     const client = await this.pool.connect();
     try {
-      // Primero verificamos si el usuario es admin (siempre premium)
+      // 1. Verificar si el usuario es admin (siempre premium)
       const adminCheck = await client.query(
         'SELECT role FROM users WHERE id = $1 AND role = $2 AND is_active = TRUE',
         [userId, 'admin']
       );
-
+  
       if (adminCheck.rows.length > 0) return true;
-
-      // Verificar usuario premium con expiración
+  
+      // 2. Verificar usuario premium con expiración
       const { rows } = await client.query(
-        `SELECT role, premium_expires_at FROM users 
-         WHERE id = $1 AND is_active = TRUE`,
+        `SELECT role, is_premium, premium_expires_at, is_active 
+         FROM users WHERE id = $1 AND is_active = TRUE`,
         [userId]
       );
-
+  
       if (rows.length === 0) return false;
-
+  
       const user = rows[0];
-
-      // Si no es premium, retornar falso
-      if (user.role !== 'premium') return false;
-
-      // Si no tiene fecha de expiración, asumir premium permanente
+  
+      // 3. Verificar si es premium por rol o por bandera is_premium
+      const isPremiumUser = user.role === 'premium' || user.is_premium === true;
+      
+      if (!isPremiumUser) return false;
+  
+      // 4. Si no tiene fecha de expiración, es premium permanente
       if (!user.premium_expires_at) return true;
-
-      // Verificar si la suscripción ha expirado
+  
+      // 5. Verificar si la suscripción ha expirado
       const now = new Date();
       const expiresAt = new Date(user.premium_expires_at);
-
+  
       if (now > expiresAt) {
-        // Si expiró, actualizar el rol a 'user'
+        // 6. Si expiró, actualizar el estado
         await client.query(
-          'UPDATE users SET role = $1, premium_expires_at = NULL, updated_at = NOW() WHERE id = $2',
+          `UPDATE users 
+           SET role = $1, 
+               is_premium = false, 
+               premium_expires_at = NULL, 
+               updated_at = NOW() 
+           WHERE id = $2`,
           ['user', userId]
         );
         return false;
       }
-
+  
       return true;
     } catch (error) {
       console.error('Error en isPremium:', error);
@@ -530,6 +537,7 @@ WHERE is_active = true;
         `UPDATE users 
          SET is_premium = true,
              premium_expires_at = $1,
+             role = 'premium',
              updated_at = NOW()
          WHERE id = $2`,
         [endDate, userId]
