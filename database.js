@@ -414,31 +414,31 @@ WHERE is_active = true;
       await client.query('BEGIN');
       
       // Buscar por mercadopago_payment_id o preference_id
-      let paymentResult = await client.query(
-        `SELECT * FROM payments 
-         WHERE (mercadopago_payment_id = $1 OR preference_id = $1)
-         AND status = 'pending'`,
-        [paymentIdentifier.toString()]
-      );
-   
-      // Si no se encuentra con status pending, buscar sin importar el estado
-      if (paymentResult.rows.length === 0) {
-        console.log('[DEBUG] Pago no encontrado con status pending, buscando en todos los estados...');
-        paymentResult = await client.query(
-          `SELECT * FROM payments 
-           WHERE mercadopago_payment_id = $1 OR preference_id = $1`,
-          [paymentIdentifier.toString()]
-        );
-        
-        if (paymentResult.rows.length === 0) {
-          throw new Error(`Pago no encontrado con ID: ${paymentIdentifier}`);
-        }
-        
-        const status = paymentResult.rows[0].status;
-        if (status === 'approved' || status === 'completed') {
-          throw new Error(`El pago ya fue procesado con estado: ${status}`);
-        }
-      }
+let paymentResult = await client.query(
+  `SELECT * FROM payments 
+   WHERE (mercadopago_payment_id = $1 OR preference_id = $1)
+   AND status = 'pending'`,
+  [paymentIdentifier.toString()]
+);
+
+// Si no se encuentra con status pending, buscar sin importar el estado
+if (paymentResult.rows.length === 0) {
+  console.log('[DEBUG] Pago no encontrado con status pending, buscando en todos los estados...');
+  paymentResult = await client.query(
+    `SELECT * FROM payments 
+     WHERE mercadopago_payment_id = $1 OR preference_id = $1`,
+    [paymentIdentifier.toString()]
+  );
+  
+  if (paymentResult.rows.length === 0) {
+    throw new Error(`Pago no encontrado con ID: ${paymentIdentifier}`);
+  }
+  
+  const status = paymentResult.rows[0].status;
+  if (status === 'approved' || status === 'completed') {
+    throw new Error(`El pago ya fue procesado con estado: ${status}`);
+  }
+}
   
       const payment = paymentResult.rows[0];
       userId = payment.user_id;
