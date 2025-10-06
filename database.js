@@ -540,7 +540,6 @@ WHERE is_active = true;
     try {
       await client.query('BEGIN');
   
-      // Validar solo los campos mínimos necesarios
       const requiredFields = ['user_id', 'preference_id', 'amount', 'currency'];
       const missingFields = requiredFields.filter(field => !paymentData[field]);
       
@@ -560,9 +559,8 @@ WHERE is_active = true;
         payment_type_id = null
       } = paymentData;
   
-      console.log(`[PAYMENT] Guardando pago para usuario ${user_id}, preferencia: ${preference_id}`);
+      console.log(`[PAYMENT] Guardando pago para usuario ${user_id}, preferencia: ${preference_id}, payment_id: ${mercadopago_payment_id}`);
   
-      // Insertar o actualizar si ya existe la preferencia
       const result = await client.query(
         `INSERT INTO payments (
           user_id, 

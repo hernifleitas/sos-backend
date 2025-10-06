@@ -184,48 +184,49 @@ router.post('/create-subscription', authenticateToken, async (req, res) => {
 });
 
 // Webhook de MercadoPago
-router.post('/webhook', express.json(), async (req, res) => {
+router.post('/webhook', async (req, res) => {
   try {
-    const data = req.body.data || req.query;
-    const paymentId = data.id || data['data.id'] || req.query.id;
+    console.log('[WEBHOOK] Datos recibidos:', req.body);
+    
+    if (req.body.type === 'payment' && req.body.data?.id) {
+      const paymentId = req.body.data.id;
+      
+      // Obtener los detalles del pago de MercadoPago
+      const payment = await mercadopago.payment.findById(paymentId);
+      const paymentData = payment.body;
+      
+      console.log('[WEBHOOK] Detalles del pago:', JSON.stringify(paymentData, null, 2));
 
-    if (!paymentId) {
-      console.error("❌ No llegó paymentId en webhook");
-      return res.status(400).json({ success: false, message: "Falta paymentId" });
+      if (paymentData.status === 'approved') {
+        // 1. Actualizar el pago en la base de datos
+        await database.savePaymentDetails({
+          user_id: paymentData.metadata?.user_id,
+          preference_id: paymentData.order?.id || paymentData.id,
+          mercadopago_payment_id: paymentData.id.toString(),
+          amount: paymentData.transaction_amount,
+          currency: paymentData.currency_id,
+          status: paymentData.status,
+          payment_method_id: paymentData.payment_method_id,
+          payment_type_id: paymentData.payment_type_id
+        });
+
+        // 2. Activar la suscripción
+        await database.activatePremiumSubscription(
+          paymentData.id.toString(),
+          {
+            status: paymentData.status,
+            payment_method_id: paymentData.payment_method_id,
+            payment_type_id: paymentData.payment_type_id,
+            preference_id: paymentData.order?.id
+          }
+        );
+      }
     }
-    // Llamada a Mercado Pago para obtener info del pago
-    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` }
-    });
-    const payment = await response.json();
-    console.log("✅ Detalles del pago:", payment);
-
-    if (payment.status === 'approved') {
-      const userId = payment.metadata?.userId;
-      const preferenceId = payment.metadata?.preference_id;
-      if (!userId || !preferenceId) return res.status(400).json({ success: false, message: "Falta userId o preferenceId" });
-
-      const pendingPayment = await database.findPendingPaymentByPreference(preferenceId, userId);
-      if (!pendingPayment) return res.status(404).json({ success: false, message: "Pago pendiente no encontrado" });  
-
-      // Activar suscripción
-      const result = await database.activatePremiumSubscription(pendingPayment.id, {
-        payment_method: payment.payment_type_id,
-        payment_type_id: payment.payment_type_id,
-        payment_id: payment.id,
-        amount: payment.transaction_amount,
-        currency: payment.currency_id,
-        status: payment.status,
-        approved_at: payment.date_approved
-      });
-
-      console.log(`⭐ Usuario ${userId} activado como PREMIUM hasta ${result.endDate}`);
-    }
-
-    res.status(200).json({ success: true });
+    
+    res.status(200).send('OK');
   } catch (error) {
-    console.error("❌ Error en webhook:", error);
-    res.status(500).json({ success: false });
+    console.error('Error en webhook:', error);
+    res.status(500).send('Error');
   }
 });
 
