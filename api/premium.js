@@ -3,6 +3,11 @@ const router = express.Router();
 const database = require('../database');
 const jwt = require('jsonwebtoken');
 
+const mercadopago = require('mercadopago');
+mercadopago.configure({
+  access_token: process.env.MP_ACCESS_TOKEN
+});
+
 // Middleware para verificar token JWT
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -191,18 +196,27 @@ router.post('/webhook', async (req, res) => {
     if (req.body.type === 'payment' && req.body.data?.id) {
       const paymentId = req.body.data.id;
       
-      // Obtener los detalles del pago de MercadoPago
-      const payment = await mercadopago.payment.findById(paymentId);
-      const paymentData = payment.body;
+      // Obtener los detalles del pago
+      const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        headers: { 'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}` }
+      });
+      const paymentData = await response.json();
       
       console.log('[WEBHOOK] Detalles del pago:', JSON.stringify(paymentData, null, 2));
 
       if (paymentData.status === 'approved') {
-        // 1. Actualizar el pago en la base de datos
+        // Buscar el pago por preference_id
+        const preferenceId = paymentData.order?.id || paymentData.metadata?.preference_id;
+        
+        if (!preferenceId) {
+          throw new Error('No se encontró preference_id en los datos del pago');
+        }
+
+        // Actualizar el pago en la base de datos
         await database.savePaymentDetails({
-          user_id: paymentData.metadata?.user_id,
-          preference_id: paymentData.order?.id || paymentData.id,
-          mercadopago_payment_id: paymentData.id.toString(),
+          user_id: paymentData.metadata?.user_id || 75, // Usar el ID del usuario de los metadatos o uno por defecto
+          preference_id: preferenceId,
+          mercadopago_payment_id: paymentId.toString(),
           amount: paymentData.transaction_amount,
           currency: paymentData.currency_id,
           status: paymentData.status,
@@ -210,14 +224,14 @@ router.post('/webhook', async (req, res) => {
           payment_type_id: paymentData.payment_type_id
         });
 
-        // 2. Activar la suscripción
+        // Activar la suscripción
         await database.activatePremiumSubscription(
-          paymentData.id.toString(),
+          preferenceId, // Usar preference_id en lugar de payment_id
           {
             status: paymentData.status,
             payment_method_id: paymentData.payment_method_id,
             payment_type_id: paymentData.payment_type_id,
-            preference_id: paymentData.order?.id
+            preference_id: preferenceId
           }
         );
       }

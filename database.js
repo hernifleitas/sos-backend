@@ -404,12 +404,8 @@ WHERE is_active = true;
       client.release();
     }
   }
-  async activatePremiumSubscription(paymentId, paymentData) {
-    console.log(`[DEBUG] activatePremiumSubscription - paymentId: ${paymentId}, paymentData:`, paymentData);
-    
-    if (!paymentId) {
-      throw new Error(`paymentId inválido: ${paymentId}`);
-    }
+  async activatePremiumSubscription(paymentIdentifier, paymentData) {
+    console.log('[DEBUG] activatePremiumSubscription - paymentIdentifier:', paymentIdentifier, 'paymentData:', paymentData);
     
     const client = await this.pool.connect();
     let userId = null;
@@ -417,28 +413,30 @@ WHERE is_active = true;
     try {
       await client.query('BEGIN');
       
-      // 1. Buscar el pago (primero con status pending, luego sin importar el estado)
+      // Buscar por mercadopago_payment_id o preference_id
       let paymentResult = await client.query(
         `SELECT * FROM payments 
-         WHERE mercadopago_payment_id = $1
+         WHERE (mercadopago_payment_id = $1 OR preference_id = $1)
          AND status = 'pending'`,
-        [paymentId.toString()]
+        [paymentIdentifier.toString()]
       );
-  
+   
       // Si no se encuentra con status pending, buscar sin importar el estado
       if (paymentResult.rows.length === 0) {
         console.log('[DEBUG] Pago no encontrado con status pending, buscando en todos los estados...');
         paymentResult = await client.query(
           `SELECT * FROM payments 
-           WHERE mercadopago_payment_id = $1`,
-          [paymentId.toString()]
+           WHERE mercadopago_payment_id = $1 OR preference_id = $1`,
+          [paymentIdentifier.toString()]
         );
         
-        if (paymentResult.rows.length > 0) {
-          const status = paymentResult.rows[0].status;
+        if (paymentResult.rows.length === 0) {
+          throw new Error(`Pago no encontrado con ID: ${paymentIdentifier}`);
+        }
+        
+        const status = paymentResult.rows[0].status;
+        if (status === 'approved' || status === 'completed') {
           throw new Error(`El pago ya fue procesado con estado: ${status}`);
-        } else {
-          throw new Error(`Pago no encontrado con ID: ${paymentId}`);
         }
       }
   
@@ -448,7 +446,7 @@ WHERE is_active = true;
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + 1); // 1 mes de suscripción
       
-      console.log(`[DEBUG] Procesando pago para usuario ID: ${userId}, paymentId: ${paymentId}`);
+      console.log(`[DEBUG] Procesando pago para usuario ID: ${userId}, paymentId: ${paymentIdentifier}`);
   
       // 2. Desactivar suscripciones activas anteriores
       await client.query(
