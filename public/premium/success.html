@@ -184,7 +184,6 @@
     </div>
     
     <script>
-        // Obtener parámetros de la URL
         const urlParams = new URLSearchParams(window.location.search);
         const paymentId = urlParams.get('payment_id');
         const status = urlParams.get('status');
@@ -192,7 +191,6 @@
         
         document.getElementById('paymentId').textContent = paymentId || 'N/A';
         
-        // Activar premium automáticamente
         async function activatePremium() {
             if (!paymentId || !token) {
                 showError('Faltan datos para activar el premium');
@@ -209,17 +207,25 @@
                 });
                 
                 const data = await response.json();
+                console.log("[SUCCESS PAGE] Respuesta del backend:", data);
                 
                 if (data.success) {
-                    document.getElementById('paymentStatus').textContent = '✓ Activado';
+                    document.getElementById('paymentStatus').textContent = '✓ ' + (data.status || 'Activado');
                     document.getElementById('paymentStatus').style.color = '#27ae60';
                     
-                    if (data.expiresAt) {
-                        const expiryDate = new Date(data.expiresAt).toLocaleDateString('es-ES');
+                    if (data.valid_until) {
+                        const expiryDate = new Date(data.valid_until).toLocaleDateString('es-AR', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        });
                         document.getElementById('expiryDate').textContent = expiryDate;
+                    } else {
+                        document.getElementById('expiryDate').textContent = 'No disponible';
                     }
-                    
-                    showSuccess('¡Tu cuenta Premium ha sido activada exitosamente!');
+    
+                    showSuccess('✅ Premium activado correctamente\nVálido hasta: ' + 
+                        new Date(data.valid_until).toLocaleDateString('es-AR'));
                 } else {
                     showError(data.message || 'Error activando premium');
                 }
@@ -246,16 +252,10 @@
         }
         
         function returnToApp() {
-            // Intentar abrir la app con deep link
             window.location.href = 'ridersos://premium-success';
-            
-            // Fallback: cerrar ventana después de 1 segundo
-            setTimeout(() => {
-                window.close();
-            }, 1000);
+            setTimeout(() => window.close(), 1000);
         }
         
-        // Ejecutar activación al cargar
         if (status === 'approved' && paymentId) {
             activatePremium();
         } else {

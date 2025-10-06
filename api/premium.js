@@ -103,8 +103,9 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Suscripción activada con éxito',
-      expiresAt: result.endDate
+      message: 'Premium activado correctamente',
+      status: 'Activado',
+      valid_until: result.endDate
     });
 
   } catch (error) {
