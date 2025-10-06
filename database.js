@@ -404,8 +404,12 @@ WHERE is_active = true;
       client.release();
     }
   }
-  async activatePremiumSubscription(paymentIdentifier, paymentData) {
-    console.log('[DEBUG] activatePremiumSubscription - paymentIdentifier:', paymentIdentifier, 'paymentData:', paymentData);
+  async activatePremiumSubscription(paymentId, paymentData) {
+    console.log(`[DEBUG] activatePremiumSubscription - paymentId: ${paymentId}, paymentData:`, paymentData);
+    
+    if (!paymentId) {
+      throw new Error(`paymentId inválido: ${paymentId}`);
+    }
     
     const client = await this.pool.connect();
     let userId = null;
@@ -413,32 +417,30 @@ WHERE is_active = true;
     try {
       await client.query('BEGIN');
       
-      // Buscar por mercadopago_payment_id o preference_id
-let paymentResult = await client.query(
-  `SELECT * FROM payments 
-   WHERE (mercadopago_payment_id = $1 OR preference_id = $1)
-   AND status = 'pending'`,
-  [paymentIdentifier.toString()]
-);
-
-// Si no se encuentra con status pending, buscar sin importar el estado
-if (paymentResult.rows.length === 0) {
-  console.log('[DEBUG] Pago no encontrado con status pending, buscando en todos los estados...');
-  paymentResult = await client.query(
-    `SELECT * FROM payments 
-     WHERE mercadopago_payment_id = $1 OR preference_id = $1`,
-    [paymentIdentifier.toString()]
-  );
+      // 1. Buscar el pago (primero con status pending, luego sin importar el estado)
+      let paymentResult = await client.query(
+        `SELECT * FROM payments 
+         WHERE mercadopago_payment_id = $1
+         AND status = 'pending'`,
+        [paymentId.toString()]
+      );
   
-  if (paymentResult.rows.length === 0) {
-    throw new Error(`Pago no encontrado con ID: ${paymentIdentifier}`);
-  }
-  
-  const status = paymentResult.rows[0].status;
-  if (status === 'approved' || status === 'completed') {
-    throw new Error(`El pago ya fue procesado con estado: ${status}`);
-  }
-}
+      // Si no se encuentra con status pending, buscar sin importar el estado
+      if (paymentResult.rows.length === 0) {
+        console.log('[DEBUG] Pago no encontrado con status pending, buscando en todos los estados...');
+        paymentResult = await client.query(
+          `SELECT * FROM payments 
+           WHERE mercadopago_payment_id = $1`,
+          [paymentId.toString()]
+        );
+        
+        if (paymentResult.rows.length > 0) {
+          const status = paymentResult.rows[0].status;
+          throw new Error(`El pago ya fue procesado con estado: ${status}`);
+        } else {
+          throw new Error(`Pago no encontrado con ID: ${paymentId}`);
+        }
+      }
   
       const payment = paymentResult.rows[0];
       userId = payment.user_id;
@@ -446,7 +448,7 @@ if (paymentResult.rows.length === 0) {
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + 1); // 1 mes de suscripción
       
-      console.log(`[DEBUG] Procesando pago para usuario ID: ${userId}, paymentId: ${paymentIdentifier}`);
+      console.log(`[DEBUG] Procesando pago para usuario ID: ${userId}, paymentId: ${paymentId}`);
   
       // 2. Desactivar suscripciones activas anteriores
       await client.query(
@@ -533,84 +535,86 @@ if (paymentResult.rows.length === 0) {
       client.release();
     }
   }
-  async savePaymentDetails(paymentData) {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-  
-      const requiredFields = ['user_id', 'preference_id', 'amount', 'currency'];
-      const missingFields = requiredFields.filter(field => !paymentData[field]);
-      
-      if (missingFields.length > 0) {
-        throw new Error(`Campos requeridos faltantes: ${missingFields.join(', ')}`);
-      }
-  
-      const {
+async savePaymentDetails(paymentData) {
+  const client = await this.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Validar solo los campos mínimos necesarios
+    const requiredFields = ['user_id', 'preference_id', 'amount', 'currency'];
+    const missingFields = requiredFields.filter(field => !paymentData[field]);
+    
+    if (missingFields.length > 0) {
+      throw new Error(`Campos requeridos faltantes: ${missingFields.join(', ')}`);
+    }
+
+    const {
+      user_id,
+      preference_id,
+      amount,
+      currency,
+      subscription_id = null,
+      status = 'pending',
+      mercadopago_payment_id = null,
+      payment_method_id = null,
+      payment_type_id = null
+    } = paymentData;
+
+    console.log(`[PAYMENT] Guardando pago para usuario ${user_id}, preferencia: ${preference_id}`);
+
+    // Insertar o actualizar si ya existe la preferencia
+    const result = await client.query(
+      `INSERT INTO payments (
+        user_id, 
+        preference_id, 
+        amount, 
+        currency, 
+        subscription_id,
+        status,
+        mercadopago_payment_id,
+        payment_method_id,
+        payment_type_id,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+      ON CONFLICT (preference_id) 
+      DO UPDATE SET
+        status = EXCLUDED.status,
+        mercadopago_payment_id = COALESCE(EXCLUDED.mercadopago_payment_id, payments.mercadopago_payment_id),
+        payment_method_id = COALESCE(EXCLUDED.payment_method_id, payments.payment_method_id),
+        payment_type_id = COALESCE(EXCLUDED.payment_type_id, payments.payment_type_id),
+        updated_at = NOW()
+      RETURNING *`,
+      [
         user_id,
         preference_id,
         amount,
         currency,
-        subscription_id = null,
-        status = 'pending',
-        mercadopago_payment_id = null,
-        payment_method_id = null,
-        payment_type_id = null
-      } = paymentData;
-  
-      console.log(`[PAYMENT] Guardando pago para usuario ${user_id}, preferencia: ${preference_id}, payment_id: ${mercadopago_payment_id}`);
-  
-      const result = await client.query(
-        `INSERT INTO payments (
-          user_id, 
-          preference_id, 
-          amount, 
-          currency, 
-          subscription_id,
-          status,
-          mercadopago_payment_id,
-          payment_method_id,
-          payment_type_id,
-          created_at,
-          updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-        ON CONFLICT (preference_id) 
-        DO UPDATE SET
-          status = EXCLUDED.status,
-          mercadopago_payment_id = COALESCE(EXCLUDED.mercadopago_payment_id, payments.mercadopago_payment_id),
-          payment_method_id = COALESCE(EXCLUDED.payment_method_id, payments.payment_method_id),
-          payment_type_id = COALESCE(EXCLUDED.payment_type_id, payments.payment_type_id),
-          updated_at = NOW()
-        RETURNING *`,
-        [
-          user_id,
-          preference_id,
-          amount,
-          currency,
-          subscription_id,
-          status,
-          mercadopago_payment_id,
-          payment_method_id,
-          payment_type_id
-        ]
-      );
-  
-      await client.query('COMMIT');
-      return result.rows[0];
-  
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Error en savePaymentDetails:', {
-        error: error.message,
-        paymentData: {
-          ...paymentData,
-          card_token: paymentData.card_token ? '[FILTRADO]' : undefined
-        }
-      });
-      throw error;
-    } finally {
-      client.release();
-    }
+        subscription_id,
+        status,
+        mercadopago_payment_id,
+        payment_method_id,
+        payment_type_id
+      ]
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0];
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error en savePaymentDetails:', {
+      error: error.message,
+      paymentData: {
+        ...paymentData,
+        card_token: paymentData.card_token ? '[FILTRADO]' : undefined
+      }
+    });
+    throw error;
+  } finally {
+    client.release();
   }
+}
   // =================== CHAT ===================
   addMessage(userId, content, room = 'global') {
     return (async () => {
