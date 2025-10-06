@@ -542,7 +542,7 @@ WHERE is_active = true;
       // Si ya existe, retornar la suscripción existente
       if (existingSubscription.rows.length > 0) {
         console.log(`[INFO] Ya existe una suscripción con el pago ${paymentId}`);
-        await client.query('COMMIT');  // Asegurarse de hacer commit antes de retornar
+        await client.query('COMMIT');
         return {
           success: true,
           message: 'Suscripción ya activada previamente',
