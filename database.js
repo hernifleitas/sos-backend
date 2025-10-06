@@ -427,10 +427,9 @@ WHERE is_active = true;
   
       // Si no se encuentra con status pending, buscar sin importar el estado
       if (paymentResult.rows.length === 0) {
-        console.log('[DEBUG] Pago no encontrado con status pending, buscando en todos los estados...');
         paymentResult = await client.query(
           `SELECT * FROM payments 
-           WHERE mercadopago_payment_id = $1`,
+           WHERE mercadopago_payment_id = $1 OR preference_id = $1`,
           [paymentId.toString()]
         );
         
