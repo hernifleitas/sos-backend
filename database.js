@@ -535,8 +535,8 @@ WHERE is_active = true;
 
       const existingSubscription = await client.query(
         `SELECT * FROM premium_subscriptions 
-         WHERE mercadopago_payment_id = $1 OR payment_id = $2`,
-        [paymentId, payment.id]  // Buscar tanto por paymentId (mercadopago) como por payment.id (local)
+         WHERE mercadopago_payment_id = $1`,
+        [paymentId]
       );
       
       // Si ya existe, retornar la suscripción existente
