@@ -469,47 +469,38 @@ WHERE is_active = true;
         if (paymentResult.rows.length === 0) {
           throw new Error(`Pago no encontrado con ID: ${paymentId}`);
         }
-        
-        // Si el pago ya fue procesado, lo consideramos exitoso
-        const status = paymentResult.rows[0].status;
-        if (status === 'approved' || status === 'completed') {
-          console.log(`[INFO] El pago ya fue procesado con estado: ${status}, verificando suscripción...`);
-          
-          // Verificar si el usuario ya tiene una suscripción activa
-          const subscriptionCheck = await client.query(
-            `SELECT ps.* FROM premium_subscriptions ps
-             JOIN payments p ON ps.payment_id = p.id
-             WHERE p.mercadopago_payment_id = $1
-             AND ps.is_active = true
-             AND p.status = 'approved'`,
-            [paymentId.toString()]
-          );
-        
-          if (subscriptionCheck.rows.length > 0) {
-            console.log(`[INFO] El usuario ya tiene una suscripción activa para este pago`);
-            return {
-              success: true,
-              message: `El usuario ya tiene una suscripción activa para este pago`,
-              alreadyProcessed: true
-            };
-          }
-        
-          // Si el pago está aprobado pero no hay suscripción activa, continuar con la activación
-          console.log(`[INFO] Reactivando suscripción para pago aprobado previamente`);
-          userId = paymentResult.rows[0].user_id;
-        } else {
-          // Si el pago no está aprobado, lanzar error
-          throw new Error(`Estado de pago inesperado: ${status}`);
-        }
       }
   
-      // Si llegamos aquí, el pago está pendiente o tiene un estado inesperado
       const payment = paymentResult.rows[0];
-      if (payment.status !== 'pending') {
-        throw new Error(`Estado de pago inesperado: ${payment.status}`);
+      userId = payment.user_id;
+      const status = payment.status;
+  
+      // Si el pago ya fue procesado, verificar la suscripción
+      if (status === 'approved' || status === 'completed') {
+        console.log(`[INFO] El pago ya fue procesado con estado: ${status}, verificando suscripción...`);
+        
+        const subscriptionCheck = await client.query(
+          `SELECT * FROM premium_subscriptions 
+           WHERE payment_id = $1 AND is_active = true`,
+          [payment.id]
+        );
+      
+        if (subscriptionCheck.rows.length > 0) {
+          console.log(`[INFO] El usuario ya tiene una suscripción activa para este pago`);
+          return {
+            success: true,
+            message: `El usuario ya tiene una suscripción activa para este pago`,
+            alreadyProcessed: true
+          };
+        }
+        // Si no hay suscripción activa, continuar con la activación
+        console.log(`[INFO] Reactivando suscripción para pago aprobado previamente`);
+      } 
+      // Si el pago no está aprobado ni completado
+      else if (status !== 'pending') {
+        throw new Error(`Estado de pago inesperado: ${status}`);
       }
   
-      userId = payment.user_id;
       const startDate = new Date();
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + 1); // 1 mes de suscripción
@@ -525,20 +516,22 @@ WHERE is_active = true;
         [userId]
       );
   
-      // 3. Actualizar el estado del pago
-      await client.query(
-        `UPDATE payments 
-         SET payment_method_id = $1,
-             payment_type_id = $2,
-             status = 'approved',
-             updated_at = NOW()
-         WHERE id = $3`,
-        [
-          paymentData.payment_method_id || null, 
-          paymentData.payment_type_id || null,
-          payment.id
-        ]
-      );
+      // 3. Actualizar el estado del pago si es necesario
+      if (status !== 'approved' && status !== 'completed') {
+        await client.query(
+          `UPDATE payments 
+           SET payment_method_id = $1,
+               payment_type_id = $2,
+               status = 'approved',
+               updated_at = NOW()
+           WHERE id = $3`,
+          [
+            paymentData.payment_method_id || null, 
+            paymentData.payment_type_id || null,
+            payment.id
+          ]
+        );
+      }
   
       // 4. Crear nueva suscripción
       const subscriptionResult = await client.query(
@@ -566,6 +559,7 @@ WHERE is_active = true;
   
       await client.query('COMMIT');
       
+      console.log(`[SUCCESS] Suscripción premium activada para usuario ${userId}`);
       return { 
         success: true, 
         message: 'Suscripción premium activada correctamente',
