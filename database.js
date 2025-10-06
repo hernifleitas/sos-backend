@@ -47,19 +47,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_user_active_subscription
 ON premium_subscriptions(user_id) 
 WHERE is_active = true;
       `);
-
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS premium_subscriptions (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-          start_date TIMESTAMP NOT NULL DEFAULT NOW(),
-          end_date TIMESTAMP NOT NULL,
-          is_active BOOLEAN DEFAULT TRUE,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-      `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS messages (
           id SERIAL PRIMARY KEY,
@@ -422,9 +409,9 @@ WHERE is_active = true;
       await client.query('BEGIN');
       const paymentResult = await client.query(
         `SELECT * FROM payments 
-         WHERE (id = $1 OR payment_id = $2) 
-         AND status = $3`,
-        [parseInt(paymentId, 10), String(paymentId), 'pending']
+         WHERE id = $1 
+         AND status = 'pending'`,
+        [parseInt(paymentId, 10)]
       );
   
       if (paymentResult.rows.length === 0) {
@@ -452,13 +439,13 @@ WHERE is_active = true;
       // 4. Actualizar el estado del pago
       await client.query(
         `UPDATE payments 
-         SET status = 'completed', 
-             payment_method_id = $1,
-             payment_type_id = $2,
-             updated_at = NOW()
-         WHERE id = $3`,
-        [paymentData.payment_method_id, paymentData.payment_type_id, paymentId]
-      );
+        SET status = 'completed', 
+            payment_method_id = $1,
+            payment_type_id = $2,
+            updated_at = NOW()
+        WHERE id = $3`,
+       [paymentData.payment_method_id, paymentData.payment_type_id, parseInt(paymentId, 10)]
+     );
 
       // 5. Actualizar el estado premium del usuario
       await client.query(

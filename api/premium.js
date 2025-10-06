@@ -183,7 +183,6 @@ router.post('/webhook', express.json(), async (req, res) => {
       console.error("❌ No llegó paymentId en webhook");
       return res.status(400).json({ success: false, message: "Falta paymentId" });
     }
-
     // Llamada a Mercado Pago para obtener info del pago
     const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
       headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` }
@@ -262,7 +261,7 @@ router.post('/activate-manual', authenticateToken, async (req, res) => {
         userId,
         'MANUAL-' + Date.now(),
         'MANUAL-PAY-' + Date.now(),
-        5000, // Monto fijo
+        5000,
         'ARS',
         'approved'
       ]);
