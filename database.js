@@ -540,7 +540,7 @@ WHERE is_active = true;
           start_date, 
           end_date, 
           is_active,
-          payment_id
+          mercadopago_payment_id
         ) VALUES ($1, $2, $3, true, $4)
         RETURNING *`,
         [userId, startDate, endDate, payment.id]
