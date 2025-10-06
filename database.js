@@ -535,13 +535,14 @@ WHERE is_active = true;
 
       const existingSubscription = await client.query(
         `SELECT * FROM premium_subscriptions 
-         WHERE mercadopago_payment_id = $1`,
-        [paymentId]
+         WHERE mercadopago_payment_id = $1 OR payment_id = $2`,
+        [paymentId, payment.id]  // Buscar tanto por paymentId (mercadopago) como por payment.id (local)
       );
       
       // Si ya existe, retornar la suscripción existente
       if (existingSubscription.rows.length > 0) {
         console.log(`[INFO] Ya existe una suscripción con el pago ${paymentId}`);
+        await client.query('COMMIT');  // Asegurarse de hacer commit antes de retornar
         return {
           success: true,
           message: 'Suscripción ya activada previamente',
@@ -549,7 +550,6 @@ WHERE is_active = true;
           alreadyProcessed: true
         };
       }
-  
       // 4. Crear nueva suscripción
       const subscriptionResult = await client.query(
         `INSERT INTO premium_subscriptions (
