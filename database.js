@@ -258,11 +258,11 @@ WHERE is_active = true;
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-  
+
       // Calcular fecha de expiración
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + months);
-  
+
       // 1. Actualizar el usuario
       await client.query(`
         UPDATE users 
@@ -273,7 +273,7 @@ WHERE is_active = true;
           updated_at = NOW()
         WHERE id = $2
       `, [endDate, userId]);
-  
+
       // 2. Desactivar suscripciones anteriores
       await client.query(`
         UPDATE premium_subscriptions 
@@ -281,7 +281,7 @@ WHERE is_active = true;
             updated_at = NOW() 
         WHERE user_id = $1
       `, [userId]);
-  
+
       // 3. Crear nueva suscripción
       await client.query(`
         INSERT INTO premium_subscriptions 
@@ -289,11 +289,11 @@ WHERE is_active = true;
         VALUES 
           ($1, NOW(), $2, true)
       `, [userId, endDate]);
-  
+
       await client.query('COMMIT');
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         message: 'Usuario actualizado a premium exitosamente',
         expiresAt: endDate
       };
@@ -402,8 +402,12 @@ WHERE is_active = true;
       client.release();
     }
   }
-  
+
   async activatePremiumSubscription(paymentId, paymentData) {
+    console.log('activatePremiumSubscription:', { paymentId, type: typeof paymentId });
+    if (!paymentId || isNaN(parseInt(paymentId, 10))) {
+      throw new Error(`paymentId inválido: ${paymentId}`);
+    }
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -413,14 +417,14 @@ WHERE is_active = true;
          AND status = 'pending'`,
         [parseInt(paymentId, 10)]
       );
-  
+
       if (paymentResult.rows.length === 0) {
         throw new Error('Pago no encontrado o ya procesado');
       }
-  
+
       const payment = paymentResult.rows[0];
       const userId = payment.user_id;
-  
+
 
       // 2. Calcular fechas de inicio y fin
       const startDate = new Date();
@@ -444,8 +448,8 @@ WHERE is_active = true;
             payment_type_id = $2,
             updated_at = NOW()
         WHERE id = $3`,
-       [paymentData.payment_method_id, paymentData.payment_type_id, parseInt(paymentId, 10)]
-     );
+        [paymentData.payment_method_id, paymentData.payment_type_id, parseInt(paymentId, 10)]
+      );
 
       // 5. Actualizar el estado premium del usuario
       await client.query(
@@ -496,9 +500,9 @@ WHERE is_active = true;
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-  
+
       const { user_id, preference_id, amount, currency, subscription_id, payment_id } = paymentData;
-  
+
       const result = await client.query(
         `INSERT INTO payments (
           user_id, 
@@ -514,7 +518,7 @@ WHERE is_active = true;
         RETURNING id`,
         [user_id, preference_id, amount, currency, subscription_id, payment_id]
       );
-  
+
       await client.query('COMMIT');
       return result.rows[0];
     } catch (error) {
@@ -525,7 +529,7 @@ WHERE is_active = true;
       client.release();
     }
   }
-  
+
 
   // =================== CHAT ===================
   addMessage(userId, content, room = 'global') {
