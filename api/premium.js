@@ -190,51 +190,80 @@ router.post('/webhook', async (req, res) => {
     
     if (req.body.type === 'payment' && req.body.data?.id) {
       const paymentId = req.body.data.id;
+      console.log(`[WEBHOOK] Procesando pago ID: ${paymentId}`);
       
-      // Obtener los detalles del pago
+      // 1. Obtener detalles del pago
       const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
         headers: { 'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}` }
       });
-      const paymentData = await response.json();
       
+      if (!response.ok) {
+        throw new Error(`Error al obtener detalles del pago: ${response.status}`);
+      }
+      
+      const paymentData = await response.json();
       console.log('[WEBHOOK] Detalles del pago:', JSON.stringify(paymentData, null, 2));
 
+      // 2. Verificar si el pago ya fue procesado
+      const existingPayment = await database.pool.query(
+        'SELECT id, status FROM payments WHERE mercadopago_payment_id = $1',
+        [paymentId]
+      );
+
+      if (existingPayment.rows.length > 0 && existingPayment.rows[0].status === 'approved') {
+        console.log(`[WEBHOOK] Pago ${paymentId} ya fue procesado anteriormente`);
+        return res.status(200).send('OK');
+      }
+
+      // 3. Obtener preferencia para el user_id
+      const preferenceResponse = await fetch(
+        `https://api.mercadopago.com/checkout/preferences/${paymentData.order?.id || paymentData.metadata?.preference_id}`,
+        { headers: { 'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}` } }
+      );
+      
+      if (!preferenceResponse.ok) {
+        throw new Error('Error al obtener detalles de la preferencia');
+      }
+      
+      const preference = await preferenceResponse.json();
+      const userId = preference.metadata?.user_id;
+      
+      if (!userId) {
+        throw new Error('No se encontró user_id en los metadatos de la preferencia');
+      }
+
+      // 4. Actualizar pago en la base de datos
+      await database.savePaymentDetails({
+        user_id: userId,
+        preference_id: paymentData.order?.id || paymentData.metadata?.preference_id,
+        mercadopago_payment_id: paymentId,
+        amount: paymentData.transaction_amount,
+        currency: paymentData.currency_id,
+        status: paymentData.status,
+        payment_method_id: paymentData.payment_method_id,
+        payment_type_id: paymentData.payment_type_id
+      });
+
+      // 5. Si el pago está aprobado, activar la suscripción
       if (paymentData.status === 'approved') {
-        // Buscar el pago por preference_id
-        const preferenceId = paymentData.order?.id || paymentData.metadata?.preference_id;
-        
-        if (!preferenceId) {
-          throw new Error('No se encontró preference_id en los datos del pago');
-        }
-
-        // Actualizar el pago en la base de datos
-        await database.savePaymentDetails({
-          user_id: paymentData.metadata?.user_id || 75, // Usar el ID del usuario de los metadatos o uno por defecto
-          preference_id: preferenceId,
-          mercadopago_payment_id: paymentId.toString(),
-          amount: paymentData.transaction_amount,
-          currency: paymentData.currency_id,
-          status: paymentData.status,
-          payment_method_id: paymentData.payment_method_id,
-          payment_type_id: paymentData.payment_type_id
-        });
-
-        // Activar la suscripción
+        console.log(`[WEBHOOK] Activando suscripción para usuario ${userId}`);
         await database.activatePremiumSubscription(
-          preferenceId, // Usar preference_id en lugar de payment_id
+          paymentId, // Usar paymentId en lugar de preferenceId
           {
             status: paymentData.status,
             payment_method_id: paymentData.payment_method_id,
             payment_type_id: paymentData.payment_type_id,
-            preference_id: preferenceId
+            payment_id: paymentId
           }
         );
       }
+
+      console.log(`[WEBHOOK] Procesamiento completado para pago ${paymentId}`);
     }
     
     res.status(200).send('OK');
   } catch (error) {
-    console.error('Error en webhook:', error);
+    console.error('[WEBHOOK] Error:', error);
     res.status(500).send('Error');
   }
 });
