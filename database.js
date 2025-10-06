@@ -354,6 +354,27 @@ WHERE is_active = true;
       client.release();
     }
   }
+  // Verificar si un usuario es administrador
+async isAdmin(userId) {
+  const client = await this.pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT is_admin FROM users WHERE id = $1',
+      [userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return false;
+    }
+    
+    return result.rows[0].is_admin === true;
+  } catch (error) {
+    console.error('Error en isAdmin:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
   async isPremium(userId) {
     const client = await this.pool.connect();
