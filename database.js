@@ -420,7 +420,7 @@ WHERE is_active = true;
         `SELECT * FROM payments 
          WHERE mercadopago_payment_id = $1
          AND status = 'pending'`,
-        [paymentId]
+        [paymentId.toString()]
       );
   
       if (paymentResult.rows.length === 0) {
@@ -528,7 +528,7 @@ WHERE is_active = true;
           updated_at
         ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW(), NOW())
         RETURNING id`,
-        [user_id, preference_id, amount, currency, subscription_id, mercadopago_payment_id]
+        [user_id, preference_id, amount, currency, subscription_id, mercadopago_payment_id.toString()]
       );
   
       await client.query('COMMIT');
