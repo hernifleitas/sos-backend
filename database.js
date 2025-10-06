@@ -367,7 +367,7 @@ async isAdmin(userId) {
       return false;
     }
     
-    return result.rows[0].is_admin === true;
+    return result.rows[0].role === 'admin';
   } catch (error) {
     console.error('Error en isAdmin:', error);
     throw error;
