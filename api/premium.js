@@ -91,7 +91,7 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
     }
 
     // Activar suscripción en la DB
-    const result = await database.activatePremiumSubscription(payment.metadata.userId, {
+    const result = await database.activatePremiumSubscription(payment.id, {
       payment_method_id: payment.payment_type_id,
       payment_type_id: payment.payment_type_id,
       payment_id: payment.id,
@@ -99,7 +99,7 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
       currency: payment.currency_id,
       status: 'approved',
       approved_at: payment.date_approved
-    });
+    })
 
     res.json({
       success: true,
