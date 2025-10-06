@@ -3,11 +3,6 @@ const router = express.Router();
 const database = require('../database');
 const jwt = require('jsonwebtoken');
 
-const mercadopago = require('mercadopago');
-mercadopago.configure({
-  access_token: process.env.MP_ACCESS_TOKEN
-});
-
 // Middleware para verificar token JWT
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
