@@ -420,12 +420,12 @@ WHERE is_active = true;
       // 1. Buscar el pago (primero con status pending, luego sin importar el estado)
       let paymentResult = await client.query(
         `SELECT * FROM payments 
-         WHERE mercadopago_payment_id = $1
+         WHERE (mercadopago_payment_id = $1 OR preference_id = $1)
          AND status = 'pending'`,
         [paymentId.toString()]
       );
   
-      // Si no se encuentra con status pending, buscar sin importar el estado
+      // Si no se encuentra con status pending, buscar en todos los estados
       if (paymentResult.rows.length === 0) {
         paymentResult = await client.query(
           `SELECT * FROM payments 
@@ -433,15 +433,29 @@ WHERE is_active = true;
           [paymentId.toString()]
         );
         
-        if (paymentResult.rows.length > 0) {
-          const status = paymentResult.rows[0].status;
-          throw new Error(`El pago ya fue procesado con estado: ${status}`);
-        } else {
+        // Si no se encuentra el pago en absoluto
+        if (paymentResult.rows.length === 0) {
           throw new Error(`Pago no encontrado con ID: ${paymentId}`);
+        }
+        
+        // Si el pago ya fue procesado, lo consideramos exitoso
+        const status = paymentResult.rows[0].status;
+        if (status === 'approved' || status === 'completed') {
+          console.log(`[INFO] El pago ya fue procesado previamente con estado: ${status}`);
+          return { 
+            success: true, 
+            message: `Pago ya procesado con estado: ${status}`,
+            alreadyProcessed: true
+          };
         }
       }
   
+      // Si llegamos aquí, el pago está pendiente o tiene un estado inesperado
       const payment = paymentResult.rows[0];
+      if (payment.status !== 'pending') {
+        throw new Error(`Estado de pago inesperado: ${payment.status}`);
+      }
+  
       userId = payment.user_id;
       const startDate = new Date();
       const endDate = new Date();
@@ -458,35 +472,38 @@ WHERE is_active = true;
         [userId]
       );
   
-      // 3. Crear la nueva suscripción premium
-      await client.query(
-        `INSERT INTO premium_subscriptions 
-         (user_id, start_date, end_date, is_active, mercadopago_payment_id)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, end_date`,
-        [userId, startDate, endDate, true, paymentId.toString()]
-      );
-  
-      // 4. Actualizar el estado del pago
+      // 3. Actualizar el estado del pago
       await client.query(
         `UPDATE payments 
-         SET status = 'completed', 
-             payment_method_id = $1,
+         SET payment_method_id = $1,
              payment_type_id = $2,
+             status = 'approved',
              updated_at = NOW()
-         WHERE mercadopago_payment_id = $3`,
+         WHERE id = $3`,
         [
           paymentData.payment_method_id || null, 
-          paymentData.payment_type_id || null, 
-          paymentId.toString()
+          paymentData.payment_type_id || null,
+          payment.id
         ]
       );
   
-      // 5. Actualizar el estado premium del usuario
+      // 4. Crear nueva suscripción
+      const subscriptionResult = await client.query(
+        `INSERT INTO premium_subscriptions (
+          user_id, 
+          start_date, 
+          end_date, 
+          is_active,
+          payment_id
+        ) VALUES ($1, $2, $3, true, $4)
+        RETURNING *`,
+        [userId, startDate, endDate, payment.id]
+      );
+  
+      // 5. Actualizar el usuario a premium
       await client.query(
         `UPDATE users 
-         SET is_premium = true, 
-             role = 'premium',
+         SET is_premium = true,
              premium_expires_at = $1,
              updated_at = NOW()
          WHERE id = $2`,
@@ -494,11 +511,12 @@ WHERE is_active = true;
       );
   
       await client.query('COMMIT');
-      console.log(`[DEBUG] Suscripción activada exitosamente para usuario ${userId}`);
-  
-      return {
-        success: true,
-        endDate: endDate.toISOString()
+      
+      return { 
+        success: true, 
+        message: 'Suscripción premium activada correctamente',
+        endDate: endDate.toISOString(),
+        subscription: subscriptionResult.rows[0]
       };
   
     } catch (error) {
@@ -534,6 +552,8 @@ WHERE is_active = true;
       client.release();
     }
   }
+
+
 async savePaymentDetails(paymentData) {
   const client = await this.pool.connect();
   try {
