@@ -37,7 +37,7 @@ class Database {
   start_date TIMESTAMP NOT NULL DEFAULT NOW(),
   end_date TIMESTAMP NOT NULL,
   is_active BOOLEAN DEFAULT TRUE,
-  payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+  mercadopago_payment_id VARCHAR(255) REFERENCES payments(mercadopago_payment_id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -74,6 +74,7 @@ WHERE is_active = true;
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           preference_id TEXT NOT NULL,
+          mercadopago_payment_id VARCHAR(255) UNIQUE,
           amount DECIMAL(10, 2) NOT NULL,
           currency VARCHAR(3) NOT NULL,
           subscription_id INTEGER REFERENCES premium_subscriptions(id) ON DELETE SET NULL,
@@ -98,7 +99,8 @@ WHERE is_active = true;
       // Crear triggers para updated_at
       const triggers = [
         { table: 'device_tokens', name: 'device_tokens_set_updated_at' },
-        { table: 'payments', name: 'payments_set_updated_at' }
+        { table: 'payments', name: 'payments_set_updated_at' },
+        { table: 'premium_subscriptions', name: 'premium_subscriptions_set_updated_at' }
       ];
 
       for (const trigger of triggers) {
@@ -324,7 +326,7 @@ WHERE is_active = true;
       // Quitar premium y limpiar fecha de expiración
       const result = await client.query(
         `UPDATE users 
-         SET role = 'user', premium_expires_at = NULL, updated_at = NOW() 
+         SET role = 'user', is_premium = false, premium_expires_at = NULL, updated_at = NOW() 
          WHERE id = $1 AND role = 'premium'
          RETURNING id`,
         [userId]
@@ -402,54 +404,66 @@ WHERE is_active = true;
       client.release();
     }
   }
-
   async activatePremiumSubscription(paymentId, paymentData) {
     console.log('activatePremiumSubscription:', { paymentId, type: typeof paymentId });
+  
     if (!paymentId) {
       throw new Error(`paymentId inválido: ${paymentId}`);
     }
     const client = await this.pool.connect();
+  
     try {
       await client.query('BEGIN');
+  
+      // 1. Buscar el pago pendiente
       const paymentResult = await client.query(
-        `SELECT * FROM payments WHERE id = $1 AND status = 'pending'`,
-        [paymentId] // sin parseInt
+        `SELECT * FROM payments 
+         WHERE mercadopago_payment_id = $1
+         AND status = 'pending'`,
+        [paymentId]
       );
-
+  
       if (paymentResult.rows.length === 0) {
         throw new Error('Pago no encontrado o ya procesado');
       }
-
+  
       const payment = paymentResult.rows[0];
       const userId = payment.user_id;
-
-
+  
       // 2. Calcular fechas de inicio y fin
       const startDate = new Date();
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + 1); // 1 mes de suscripción
-
-      // 3. Crear la suscripción premium
+  
+      // 3. Desactivar suscripciones activas anteriores
+      await client.query(
+        `UPDATE premium_subscriptions
+         SET is_active = false, updated_at = NOW()
+         WHERE user_id = $1 AND is_active = true`,
+        [userId]
+      );
+  
+      // 4. Crear la nueva suscripción premium
       const subscriptionResult = await client.query(
         `INSERT INTO premium_subscriptions 
-         (user_id, start_date, end_date, is_active, payment_id)
+         (user_id, start_date, end_date, is_active, mercadopago_payment_id)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, end_date`,
         [userId, startDate, endDate, true, paymentId]
       );
-
-      // 4. Actualizar el estado del pago
+  
+      // 5. Actualizar el estado del pago
       await client.query(
         `UPDATE payments 
-        SET status = 'completed', 
-            payment_method_id = $1,
-            payment_type_id = $2,
-            updated_at = NOW()
-        WHERE id = $3`,
+         SET status = 'completed', 
+             payment_method_id = $1,
+             payment_type_id = $2,
+             updated_at = NOW()
+         WHERE mercadopago_payment_id = $3`,
         [paymentData.payment_method_id, paymentData.payment_type_id, paymentId]
       );
-
-      // 5. Actualizar el estado premium del usuario
+  
+      // 6. Actualizar el estado premium del usuario
       await client.query(
         `UPDATE users 
          SET is_premium = true, 
@@ -458,13 +472,14 @@ WHERE is_active = true;
          WHERE id = $2`,
         [endDate, userId]
       );
-
+  
       await client.query('COMMIT');
+  
       return {
         success: true,
         endDate: endDate.toISOString()
       };
-
+  
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Error en activatePremiumSubscription:', error);
@@ -478,9 +493,9 @@ WHERE is_active = true;
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `SELECT ps.*, p.amount, p.currency, p.status as payment_status, p.created_at as payment_date
+        `SELECT ps.*, p.amount, p.currency, p.status as payment_status, p.created_at as payment_date, p.mercadopago_payment_id
          FROM premium_subscriptions ps
-         LEFT JOIN payments p ON p.id = ps.payment_id
+         LEFT JOIN payments p ON p.mercadopago_payment_id = ps.mercadopago_payment_id
          WHERE ps.user_id = $1
          ORDER BY ps.start_date DESC`,
         [userId]
@@ -493,14 +508,13 @@ WHERE is_active = true;
       client.release();
     }
   }
-
   async savePaymentDetails(paymentData) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-
-      const { user_id, preference_id, amount, currency, subscription_id, payment_id } = paymentData;
-
+  
+      const { user_id, preference_id, amount, currency, subscription_id, mercadopago_payment_id } = paymentData;
+  
       const result = await client.query(
         `INSERT INTO payments (
           user_id, 
@@ -509,14 +523,14 @@ WHERE is_active = true;
           currency, 
           subscription_id,
           status,
-          payment_id,
+          mercadopago_payment_id,
           created_at,
           updated_at
         ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW(), NOW())
         RETURNING id`,
-        [user_id, preference_id, amount, currency, subscription_id, payment_id]
+        [user_id, preference_id, amount, currency, subscription_id, mercadopago_payment_id]
       );
-
+  
       await client.query('COMMIT');
       return result.rows[0];
     } catch (error) {
@@ -527,6 +541,7 @@ WHERE is_active = true;
       client.release();
     }
   }
+  
 
 
   // =================== CHAT ===================
