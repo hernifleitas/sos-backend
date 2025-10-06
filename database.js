@@ -473,12 +473,33 @@ WHERE is_active = true;
         // Si el pago ya fue procesado, lo consideramos exitoso
         const status = paymentResult.rows[0].status;
         if (status === 'approved' || status === 'completed') {
-          console.log(`[INFO] El pago ya fue procesado previamente con estado: ${status}`);
-          return { 
-            success: true, 
-            message: `Pago ya procesado con estado: ${status}`,
-            alreadyProcessed: true
-          };
+          console.log(`[INFO] El pago ya fue procesado con estado: ${status}, verificando suscripción...`);
+          
+          // Verificar si el usuario ya tiene una suscripción activa
+          const subscriptionCheck = await client.query(
+            `SELECT ps.* FROM premium_subscriptions ps
+             JOIN payments p ON ps.payment_id = p.id
+             WHERE p.mercadopago_payment_id = $1
+             AND ps.is_active = true
+             AND p.status = 'approved'`,
+            [paymentId.toString()]
+          );
+        
+          if (subscriptionCheck.rows.length > 0) {
+            console.log(`[INFO] El usuario ya tiene una suscripción activa para este pago`);
+            return {
+              success: true,
+              message: `El usuario ya tiene una suscripción activa para este pago`,
+              alreadyProcessed: true
+            };
+          }
+        
+          // Si el pago está aprobado pero no hay suscripción activa, continuar con la activación
+          console.log(`[INFO] Reactivando suscripción para pago aprobado previamente`);
+          userId = paymentResult.rows[0].user_id;
+        } else {
+          // Si el pago no está aprobado, lanzar error
+          throw new Error(`Estado de pago inesperado: ${status}`);
         }
       }
   
