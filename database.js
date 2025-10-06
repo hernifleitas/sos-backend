@@ -532,6 +532,23 @@ WHERE is_active = true;
           ]
         );
       }
+
+      const existingSubscription = await client.query(
+        `SELECT * FROM premium_subscriptions 
+         WHERE mercadopago_payment_id = $1`,
+        [paymentId]
+      );
+      
+      // Si ya existe, retornar la suscripción existente
+      if (existingSubscription.rows.length > 0) {
+        console.log(`[INFO] Ya existe una suscripción con el pago ${paymentId}`);
+        return {
+          success: true,
+          message: 'Suscripción ya activada previamente',
+          subscription: existingSubscription.rows[0],
+          alreadyProcessed: true
+        };
+      }
   
       // 4. Crear nueva suscripción
       const subscriptionResult = await client.query(
