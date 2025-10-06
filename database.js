@@ -514,7 +514,8 @@ WHERE is_active = true;
       await client.query('BEGIN');
   
       const { user_id, preference_id, amount, currency, subscription_id, mercadopago_payment_id } = paymentData;
-  
+      const mpId = paymentData.mercadopago_payment_id || 'test-payment-id';
+
       const result = await client.query(
         `INSERT INTO payments (
           user_id, 
@@ -528,7 +529,7 @@ WHERE is_active = true;
           updated_at
         ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW(), NOW())
         RETURNING id`,
-        [user_id, preference_id, amount, currency, subscription_id, mercadopago_payment_id.toString()]
+        [user_id, preference_id, amount, currency, subscription_id, mpId.toString()]
       );
   
       await client.query('COMMIT');
