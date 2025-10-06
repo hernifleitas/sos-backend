@@ -405,17 +405,15 @@ WHERE is_active = true;
 
   async activatePremiumSubscription(paymentId, paymentData) {
     console.log('activatePremiumSubscription:', { paymentId, type: typeof paymentId });
-    if (!paymentId || isNaN(parseInt(paymentId, 10))) {
+    if (!paymentId) {
       throw new Error(`paymentId inválido: ${paymentId}`);
     }
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
       const paymentResult = await client.query(
-        `SELECT * FROM payments 
-         WHERE id = $1 
-         AND status = 'pending'`,
-        [parseInt(paymentId, 10)]
+        `SELECT * FROM payments WHERE id = $1 AND status = 'pending'`,
+        [paymentId] // sin parseInt
       );
 
       if (paymentResult.rows.length === 0) {
@@ -448,7 +446,7 @@ WHERE is_active = true;
             payment_type_id = $2,
             updated_at = NOW()
         WHERE id = $3`,
-        [paymentData.payment_method_id, paymentData.payment_type_id, parseInt(paymentId, 10)]
+        [paymentData.payment_method_id, paymentData.payment_type_id, paymentId]
       );
 
       // 5. Actualizar el estado premium del usuario
