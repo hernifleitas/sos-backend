@@ -117,59 +117,69 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
 router.post('/create-subscription', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
+    const amount = 5000; // Monto en centavos (50.00 ARS)
+    const currency = 'ARS';
 
-    // 1️⃣ Crear objeto preference para Checkout Pro
+    // 1️⃣ Crear preferencia de pago en MercadoPago
     const preference = {
-      items: [
-        { title: "Premium SOS", quantity: 1, unit_price: 5000 }
-      ],
-      back_urls: {
-        success: `https://sos-backend-8cpa.onrender.com/premium/success`,
-        failure: `https://sos-backend-8cpa.onrender.com/premium/failure`,
-        pending: `https://sos-backend-8cpa.onrender.com/premium/pending`
+      items: [{
+        title: 'Suscripción Premium SOS Delivery',
+        quantity: 1,
+        currency_id: currency,
+        unit_price: amount
+      }],
+      payer: {
+        name: req.user.nombre,
+        email: req.user.email
       },
-      notification_url: `https://sos-backend-8cpa.onrender.com/premium/webhook`,
-      auto_return: "approved",
-      metadata: { userId }
+      metadata: {
+        user_id: userId
+      },
+      back_urls: {
+        success: `${process.env.FRONTEND_URL}/premium/success`,
+        failure: `${process.env.FRONTEND_URL}/premium/failure`,
+        pending: `${process.env.FRONTEND_URL}/premium/pending`
+      },
+      auto_return: 'approved',
+      notification_url: `${process.env.BACKEND_URL}/api/premium/webhook`
     };
 
-    // 2️⃣ Llamar a la API de MercadoPago
-    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
-      method: "POST",
+    const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.MP_ACCESS_TOKEN}`
       },
       body: JSON.stringify(preference)
     });
 
     const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Error al crear preferencia de pago');
 
-    if (!response.ok) {
-      console.error("Error creando preferencia MP:", data);
-      return res.status(500).json({ success: false, message: 'Error creando preferencia de pago' });
-    }
-
-    // 3️⃣ Guardar pago pendiente en DB
-
+    // 2️⃣ Guardar pago pendiente en la base de datos
     await database.savePaymentDetails({
       user_id: userId,
-      payment_method: 'mercadopago',
-      preference_id: data.id, 
-      amount: 5000,
-      currency: 'ARS',
-      subscription_id: null,
-      payment_id: null, 
+      preference_id: data.id,
+      amount: amount,
+      currency: currency,
       status: 'pending'
+      // No incluimos mercadopago_payment_id porque aún no existe
     });
-    
 
-    // 4️⃣ Devolver init_point al frontend
-    res.json({ success: true, init_point: data.init_point, preferenceId: data.id });
+    // 3️⃣ Devolver la URL de pago
+    res.json({
+      success: true,
+      preferenceId: data.id,
+      init_point: data.init_point || null
+    });
 
   } catch (error) {
-    console.error("Error en create-subscription:", error);
-    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    console.error('Error en create-subscription:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al crear la suscripción',
+      error: error.message 
+    });
   }
 });
 
