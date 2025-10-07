@@ -42,7 +42,7 @@ module.exports = function initChat(io) {
         // Check de Premium/Admin antes de permitir enviar
         const hasPremium = await database.isPremium(socket.user.id);
         const isAdmin = await database.isAdmin(socket.user.id);
-        if (!hasPremium && !isAdmin) {
+        if (!hasPremium || !isAdmin) {
           if (ack) ack({ success: false, message: 'Función Premium requerida' });
           return;
         }

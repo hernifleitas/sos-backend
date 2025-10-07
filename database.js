@@ -363,12 +363,12 @@ WHERE is_active = true;
         'SELECT role FROM users WHERE id = $1',
         [userId]
       );
-      
+
       if (result.rows.length === 0) {
         console.log(`Usuario con ID ${userId} no encontrado`);
         return false;
       }
-      
+
       const userRole = result.rows[0].role;
       console.log(`Rol del usuario ${userId}:`, userRole);
       return userRole === 'admin';
@@ -388,32 +388,32 @@ WHERE is_active = true;
         'SELECT role FROM users WHERE id = $1 AND role = $2 AND is_active = TRUE',
         [userId, 'admin']
       );
-  
+
       if (adminCheck.rows.length > 0) return true;
-  
+
       // 2. Verificar usuario premium con expiración
       const { rows } = await client.query(
         `SELECT role, is_premium, premium_expires_at, is_active 
          FROM users WHERE id = $1 AND is_active = TRUE`,
         [userId]
       );
-  
+
       if (rows.length === 0) return false;
-  
+
       const user = rows[0];
-  
+
       // 3. Verificar si es premium por rol o por bandera is_premium
       const isPremiumUser = user.role === 'premium' || user.is_premium === true;
-      
+
       if (!isPremiumUser) return false;
-  
+
       // 4. Si no tiene fecha de expiración, es premium permanente
       if (!user.premium_expires_at) return true;
-  
+
       // 5. Verificar si la suscripción ha expirado
       const now = new Date();
       const expiresAt = new Date(user.premium_expires_at);
-  
+
       if (now > expiresAt) {
         // 6. Si expiró, actualizar el estado
         await client.query(
@@ -427,7 +427,7 @@ WHERE is_active = true;
         );
         return false;
       }
-  
+
       return true;
     } catch (error) {
       console.error('Error en isPremium:', error);
@@ -438,53 +438,42 @@ WHERE is_active = true;
   }
   async activatePremiumSubscription(paymentId, paymentData) {
     console.log(`[DEBUG] activatePremiumSubscription - paymentId: ${paymentId}, paymentData:`, paymentData);
-    
+
     if (!paymentId) {
       throw new Error(`paymentId inválido: ${paymentId}`);
     }
-    
+
     const client = await this.pool.connect();
     let userId = null;
-    
+
     try {
       await client.query('BEGIN');
-      
-      // 1. Buscar el pago (primero con status pending, luego sin importar el estado)
-      let paymentResult = await client.query(
-        `SELECT * FROM payments 
-         WHERE (mercadopago_payment_id = $1 OR preference_id = $1)
-         AND status = 'pending'`,
+      // Buscar solo pagos aprobados
+      const paymentResult = await client.query(
+        `SELECT * FROM payments
+   WHERE (mercadopago_payment_id = $1 OR preference_id = $1)
+     AND status = 'approved'`,
         [paymentId.toString()]
       );
-  
-      // Si no se encuentra con status pending, buscar en todos los estados
+
       if (paymentResult.rows.length === 0) {
-        paymentResult = await client.query(
-          `SELECT * FROM payments 
-           WHERE mercadopago_payment_id = $1 OR preference_id = $1`,
-          [paymentId.toString()]
-        );
-        
-        // Si no se encuentra el pago en absoluto
-        if (paymentResult.rows.length === 0) {
-          throw new Error(`Pago no encontrado con ID: ${paymentId}`);
-        }
+        throw new Error(`No se puede activar premium: pago no encontrado o no aprobado`);
       }
-  
+
       const payment = paymentResult.rows[0];
       userId = payment.user_id;
       const status = payment.status;
-  
+
       // Si el pago ya fue procesado, verificar la suscripción
       if (status === 'approved' || status === 'completed') {
         console.log(`[INFO] El pago ya fue procesado con estado: ${status}, verificando suscripción...`);
-        
+
         const subscriptionCheck = await client.query(
           `SELECT * FROM premium_subscriptions 
            WHERE mercadopago_payment_id = $1 AND is_active = true`,
           [payment.mercadopago_payment_id || paymentId]
         );
-      
+
         if (subscriptionCheck.rows.length > 0) {
           console.log(`[INFO] El usuario ya tiene una suscripción activa para este pago`);
           return {
@@ -495,18 +484,18 @@ WHERE is_active = true;
         }
         // Si no hay suscripción activa, continuar con la activación
         console.log(`[INFO] Reactivando suscripción para pago aprobado previamente`);
-      } 
+      }
       // Si el pago no está aprobado ni completado
       else if (status !== 'pending') {
         throw new Error(`Estado de pago inesperado: ${status}`);
       }
-  
+
       const startDate = new Date();
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + 1); // 1 mes de suscripción
-      
+
       console.log(`[DEBUG] Procesando pago para usuario ID: ${userId}, paymentId: ${paymentId}`);
-  
+
       // 2. Desactivar suscripciones activas anteriores
       await client.query(
         `UPDATE premium_subscriptions
@@ -515,33 +504,14 @@ WHERE is_active = true;
          WHERE user_id = $1 AND is_active = true`,
         [userId]
       );
-  
-      // 3. Actualizar el estado del pago si es necesario
-      if (status !== 'approved' && status !== 'completed') {
-        await client.query(
-          `UPDATE payments 
-           SET payment_method_id = $1,
-               payment_type_id = $2,
-               status = 'approved',
-               updated_at = NOW()
-           WHERE id = $3`,
-          [
-            paymentData.payment_method_id || null, 
-            paymentData.payment_type_id || null,
-            payment.id
-          ]
-        );
-      }
-
       const existingSubscription = await client.query(
         `SELECT * FROM premium_subscriptions 
          WHERE mercadopago_payment_id = $1`,
         [paymentId]
       );
-      
-      // Si ya existe, retornar la suscripción existente
-      if (existingSubscription.rows.length > 0) {
-        console.log(`[INFO] Ya existe una suscripción con el pago ${paymentId}`);
+
+      // Si ya existe una suscripción activa, no hacer nada
+      if (existingSubscription.rows.length > 0 && existingSubscription.rows[0].is_active) {
         await client.query('COMMIT');
         return {
           success: true,
@@ -551,9 +521,9 @@ WHERE is_active = true;
         };
       }
 
-     // 4. Crear o actualizar suscripción (evita error de clave duplicada)
-const subscriptionResult = await client.query(
-  `INSERT INTO premium_subscriptions (
+      // 4. Crear o actualizar suscripción (evita error de clave duplicada)
+      const subscriptionResult = await client.query(
+        `INSERT INTO premium_subscriptions (
       user_id,
       mercadopago_payment_id,
       start_date,
@@ -567,8 +537,8 @@ const subscriptionResult = await client.query(
       end_date = EXCLUDED.end_date,
       updated_at = NOW()
   RETURNING *;`,
-  [userId, payment.id, startDate, endDate]
-);
+        [userId, payment.id, startDate, endDate]
+      );
 
       // 5. Actualizar el usuario a premium
       await client.query(
@@ -580,17 +550,17 @@ const subscriptionResult = await client.query(
          WHERE id = $2`,
         [endDate, userId]
       );
-  
+
       await client.query('COMMIT');
-      
+
       console.log(`[SUCCESS] Suscripción premium activada para usuario ${userId}`);
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: 'Suscripción premium activada correctamente',
         endDate: endDate.toISOString(),
         subscription: subscriptionResult.rows[0]
       };
-  
+
     } catch (error) {
       await client.query('ROLLBACK');
       console.error('Error en activatePremiumSubscription:', {
@@ -626,36 +596,36 @@ const subscriptionResult = await client.query(
   }
 
 
-async savePaymentDetails(paymentData) {
-  const client = await this.pool.connect();
-  try {
-    await client.query('BEGIN');
+  async savePaymentDetails(paymentData) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Validar solo los campos mínimos necesarios
-    const requiredFields = ['user_id', 'preference_id', 'amount', 'currency'];
-    const missingFields = requiredFields.filter(field => !paymentData[field]);
-    
-    if (missingFields.length > 0) {
-      throw new Error(`Campos requeridos faltantes: ${missingFields.join(', ')}`);
-    }
+      // Validar solo los campos mínimos necesarios
+      const requiredFields = ['user_id', 'preference_id', 'amount', 'currency'];
+      const missingFields = requiredFields.filter(field => !paymentData[field]);
 
-    const {
-      user_id,
-      preference_id,
-      amount,
-      currency,
-      subscription_id = null,
-      status = 'pending',
-      mercadopago_payment_id = null,
-      payment_method_id = null,
-      payment_type_id = null
-    } = paymentData;
+      if (missingFields.length > 0) {
+        throw new Error(`Campos requeridos faltantes: ${missingFields.join(', ')}`);
+      }
 
-    console.log(`[PAYMENT] Guardando pago para usuario ${user_id}, preferencia: ${preference_id}`);
+      const {
+        user_id,
+        preference_id,
+        amount,
+        currency,
+        subscription_id = null,
+        status = 'pending',
+        mercadopago_payment_id = null,
+        payment_method_id = null,
+        payment_type_id = null
+      } = paymentData;
 
-    // Insertar o actualizar si ya existe la preferencia
-    const result = await client.query(
-      `INSERT INTO payments (
+      console.log(`[PAYMENT] Guardando pago para usuario ${user_id}, preferencia: ${preference_id}`);
+
+      // Insertar o actualizar si ya existe la preferencia
+      const result = await client.query(
+        `INSERT INTO payments (
         user_id, 
         preference_id, 
         amount, 
@@ -676,36 +646,36 @@ async savePaymentDetails(paymentData) {
         payment_type_id = COALESCE(EXCLUDED.payment_type_id, payments.payment_type_id),
         updated_at = NOW()
       RETURNING *`,
-      [
-        user_id,
-        preference_id,
-        amount,
-        currency,
-        subscription_id,
-        status,
-        mercadopago_payment_id,
-        payment_method_id,
-        payment_type_id
-      ]
-    );
+        [
+          user_id,
+          preference_id,
+          amount,
+          currency,
+          subscription_id,
+          status,
+          mercadopago_payment_id,
+          payment_method_id,
+          payment_type_id
+        ]
+      );
 
-    await client.query('COMMIT');
-    return result.rows[0];
+      await client.query('COMMIT');
+      return result.rows[0];
 
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error en savePaymentDetails:', {
-      error: error.message,
-      paymentData: {
-        ...paymentData,
-        card_token: paymentData.card_token ? '[FILTRADO]' : undefined
-      }
-    });
-    throw error;
-  } finally {
-    client.release();
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error en savePaymentDetails:', {
+        error: error.message,
+        paymentData: {
+          ...paymentData,
+          card_token: paymentData.card_token ? '[FILTRADO]' : undefined
+        }
+      });
+      throw error;
+    } finally {
+      client.release();
+    }
   }
-}
   // =================== CHAT ===================
   addMessage(userId, content, room = 'global') {
     return (async () => {

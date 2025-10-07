@@ -71,6 +71,17 @@ const notificarSOSAOtrosUsuarios = (sosData) => {
 
 // Recibir ubicación/SOS
 app.post("/sos", async (req, res) => {
+  console.log('=== NUEVA PETICIÓN SOS ===');
+  console.log('Tipo:', req.body.tipo);
+  console.log('Cancel:', req.body.cancel);
+  console.log('Rider ID:', req.body.riderId);
+  console.log('Nombre:', req.body.nombre);
+  console.log('Moto:', req.body.moto);
+  console.log('Color:', req.body.color);
+  console.log('Ubicación:', req.body.ubicacion);
+  console.log('Fecha/Hora:', req.body.fechaHora);
+  console.log('Tipo SOS Actual:', req.body.tipoSOSActual);
+  console.log('---');
   try {
     const { riderId, nombre, moto, color, ubicacion, fechaHora, tipo, tipoSOSActual, cancel } = req.body;
     // Validar sin rechazar coordenadas 0,0
@@ -294,28 +305,29 @@ app.get("/alertas", (req, res) => {
   const alertasArray = Object.keys(riders)
     .filter((riderId) => {
       const r = riders[riderId];
-      // Considerar activo si:
-      // - tipo es SOS real (no normal/actualizacion), o
-      // - tipo es 'actualizacion' y hay lastSosTipo, o
-      // - tipo es 'normal'/'actualizacion' pero hay memoria lastAlerts dentro de la gracia
+      
+      // No mostrar alertas canceladas
+      if (lastAlerts[riderId]?.tipo === 'normal' || r.tipo === 'normal') {
+        return false;
+      }
+      
+      // Resto de la lógica de filtrado
       const esSOSReal = r.tipo && r.tipo !== "normal" && r.tipo !== "actualizacion";
       const esActualizacionConSOS = r.tipo === 'actualizacion' && !!r.lastSosTipo;
       const memoria = lastAlerts[riderId];
       const memoriaVigente = memoria && ((now - memoria.timestamp) <= ALERT_GRACE_MS);
       const lastSosReciente = !!r.lastSosTipo && ((now - r.lastUpdate) <= ALERT_GRACE_MS);
+      
       return esSOSReal || esActualizacionConSOS || memoriaVigente || lastSosReciente;
     })
     .map((riderId) => {
       const r = riders[riderId];
-      // Resolver tipo a mostrar: priorizar 'tipo' SOS real; si es 'actualizacion' o 'normal', usar lastSosTipo o memoria
+      // Resolver tipo a mostrar
       let tipoMostrar = r.tipo;
-      if (tipoMostrar === 'actualizacion' || tipoMostrar === 'normal') {
-        if (r.lastSosTipo) tipoMostrar = r.lastSosTipo;
-        const memoria = lastAlerts[riderId];
-        if ((!r.lastSosTipo || tipoMostrar === 'normal') && memoria && ((now - memoria.timestamp) <= ALERT_GRACE_MS)) {
-          tipoMostrar = memoria.tipo;
-        }
+      if ((tipoMostrar === 'actualizacion' || tipoMostrar === 'normal') && r.lastSosTipo) {
+        tipoMostrar = r.lastSosTipo;
       }
+      
       return {
         riderId,
         nombre: r.nombre,
@@ -324,10 +336,10 @@ app.get("/alertas", (req, res) => {
         tipo: tipoMostrar,
         ubicacion: r.ubicacion,
         fechaHora: r.fechaHora,
-        tiempoTranscurrido: Math.floor((now - r.lastUpdate) / 1000) // en segundos
+        tiempoTranscurrido: Math.floor((now - r.lastUpdate) / 1000)
       };
     })
-    .sort((a, b) => new Date(b.fechaHora) - new Date(a.fechaHora)); // Más recientes primero
+    .sort((a, b) => new Date(b.fechaHora) - new Date(a.fechaHora));
 
   res.json(alertasArray);
 });
