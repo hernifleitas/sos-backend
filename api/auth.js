@@ -69,7 +69,7 @@ class AuthService {
       }
 
       // Validar datos
-      if (!nombre || !email || !password || !moto || !color) {
+      if (!nombre || !email || !password || !moto || !color || !telefono) {
         return {
           success: false,
           message: 'Todos los campos son requeridos'
@@ -105,9 +105,9 @@ class AuthService {
           email: newUser.email,
           moto: newUser.moto,
           color: newUser.color,
+          telefono: newUser.telefono,
           created_at: newUser.created_at,
           status: 'pending',
-          telefono: newUser.telefono
         }
       };
     } catch (error) {
@@ -167,9 +167,10 @@ class AuthService {
           email: user.email,
           moto: user.moto,
           color: user.color,
+          telefono: user.telefono,
           created_at: user.created_at,
           role: user.role || 'user',
-          telefono: user.telefono
+          
         },
         token
       };
@@ -209,9 +210,10 @@ class AuthService {
           email: user.email,
           moto: user.moto,
           color: user.color,
+          telefono: user.telefono,
           created_at: user.created_at,
           role: user.role || 'user',
-          telefono: user.telefono
+    
         }
       };
     } catch (error) {

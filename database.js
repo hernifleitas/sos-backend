@@ -133,13 +133,13 @@ WHERE is_active = true;
   // =================== MÉTODOS USUARIOS ===================
   createUser(userData) {
     return (async () => {
-      const { nombre, email, password, moto, color } = userData;
+      const { nombre, email, password, moto, color, telefono } = userData;
       const sql = `
-        INSERT INTO users (nombre, email, password, moto, color)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, nombre, email, moto, color, created_at
+        INSERT INTO users (nombre, email, password, moto, color, telefono)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, nombre, email, moto, color, telefono, created_at
       `;
-      const { rows } = await this.pool.query(sql, [nombre, email, password, moto, color]);
+      const { rows } = await this.pool.query(sql, [nombre, email, password, moto, color, telefono]);
       return rows[0];
     })();
   }
@@ -195,7 +195,7 @@ WHERE is_active = true;
   getAllUsers() {
     return (async () => {
       const { rows } = await this.pool.query(`
-        SELECT id, nombre, email, moto, color, created_at, status, role, premium_expires_at
+        SELECT id, nombre, email, moto, color, telefono, created_at, status, role, premium_expires_at
         FROM users
         WHERE is_active = TRUE
       `);
@@ -205,7 +205,7 @@ WHERE is_active = true;
 
   getPendingUsers() {
     return (async () => {
-      const { rows } = await this.pool.query("SELECT id, nombre, email, moto, color, created_at FROM users WHERE status = 'pending' AND is_active = TRUE");
+      const { rows } = await this.pool.query("SELECT id, nombre, email, moto, color, telefono, created_at FROM users WHERE status = 'pending' AND is_active = TRUE");
       return rows;
     })();
   }
@@ -550,19 +550,26 @@ WHERE is_active = true;
           alreadyProcessed: true
         };
       }
-      // 4. Crear nueva suscripción
-      const subscriptionResult = await client.query(
-        `INSERT INTO premium_subscriptions (
-          user_id, 
-          start_date, 
-          end_date, 
-          is_active,
-          mercadopago_payment_id
-        ) VALUES ($1, $2, $3, true, $4)
-        RETURNING *`,
-        [userId, startDate, endDate, payment.id]
-      );
-  
+
+     // 4. Crear o actualizar suscripción (evita error de clave duplicada)
+const subscriptionResult = await client.query(
+  `INSERT INTO premium_subscriptions (
+      user_id,
+      mercadopago_payment_id,
+      start_date,
+      end_date,
+      is_active
+  ) VALUES ($1, $2, $3, $4, true)
+  ON CONFLICT (mercadopago_payment_id)
+  DO UPDATE SET
+      is_active = EXCLUDED.is_active,
+      start_date = EXCLUDED.start_date,
+      end_date = EXCLUDED.end_date,
+      updated_at = NOW()
+  RETURNING *;`,
+  [userId, payment.id, startDate, endDate]
+);
+
       // 5. Actualizar el usuario a premium
       await client.query(
         `UPDATE users 
