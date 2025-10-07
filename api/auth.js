@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const database = require('../database');
 const emailService = require('../email');
+const logger = require('../logger');
 
 class AuthService {
   constructor() {
@@ -38,9 +39,9 @@ class AuthService {
       email: user.email,
       nombre: user.nombre
     };
-    
-    return jwt.sign(payload, this.jwtSecret, { 
-      expiresIn: this.jwtExpiresIn 
+
+    return jwt.sign(payload, this.jwtSecret, {
+      expiresIn: this.jwtExpiresIn
     });
   }
 
@@ -109,7 +110,9 @@ class AuthService {
           created_at: newUser.created_at,
           status: 'pending',
         }
+        
       };
+      
     } catch (error) {
       console.error('Error en registro:', error);
       return {
@@ -170,7 +173,7 @@ class AuthService {
           telefono: user.telefono,
           created_at: user.created_at,
           role: user.role || 'user',
-          
+
         },
         token
       };
@@ -213,7 +216,7 @@ class AuthService {
           telefono: user.telefono,
           created_at: user.created_at,
           role: user.role || 'user',
-    
+
         }
       };
     } catch (error) {
@@ -473,6 +476,17 @@ class AuthService {
         try {
           await emailService.sendApprovalEmail(user);
           console.log(`Email de aprobación enviado a ${user.email}`);
+          logger.approvedUser({
+            id: user.id,
+            nombre: user.nombre,
+            email: user.email,
+            moto: user.moto,
+            color: user.color,
+            telefono: user.telefono,
+            role: user.role,
+            created_at: user.created_at,
+            status: 'active' // O el estado que corresponda
+          });
         } catch (emailError) {
           console.error('Error enviando email de aprobación:', emailError);
         }
@@ -838,4 +852,4 @@ router.post('/activate', async (req, res) => {
   }
 });
 
-module.exports = {router, authService}
+module.exports = { router, authService }

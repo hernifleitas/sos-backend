@@ -5,8 +5,8 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
-
-const {router: authRoutes} = require('./api/auth');
+const logger = require('./logger');
+const { router: authRoutes } = require('./api/auth');
 const chatRoutes = require('./api/chat');
 const notificationsRoutes = require('./api/notifications');
 const notifications = require('./notifications');
@@ -21,8 +21,8 @@ app.use(cors());
 
 //middleware de debugging 
 //app.use((req, res, next) => {
- // console.log(`${req.method} ${req.url} - ${new Date().toISOString()}`);
-  //next();
+// console.log(`${req.method} ${req.url} - ${new Date().toISOString()}`);
+//next();
 //})
 
 // Servir archivos estáticos de premium
@@ -45,6 +45,7 @@ app.get('/premium/failure', (req, res) => {
 app.get('/premium/pending', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/premium/pending.html'));
 });
+logger.info("Iniciando servidor...");
 
 // Guardar info de riders en memoria
 let riders = {};
@@ -64,26 +65,20 @@ const notificarSOSAOtrosUsuarios = (sosData) => {
   console.log(`🏍️ Moto: ${sosData.moto} (${sosData.color})`);
   console.log(`⏰ Hora: ${sosData.fechaHora}`);
   console.log('---');
-  
+
   // Aquí se podría integrar con servicios como Firebase Cloud Messaging
   // para enviar notificaciones push reales a otros usuarios
 };
 
 // Recibir ubicación/SOS
 app.post("/sos", async (req, res) => {
-  console.log('=== NUEVA PETICIÓN SOS ===');
-  console.log('Tipo:', req.body.tipo);
-  console.log('Cancel:', req.body.cancel);
-  console.log('Rider ID:', req.body.riderId);
-  console.log('Nombre:', req.body.nombre);
-  console.log('Moto:', req.body.moto);
-  console.log('Color:', req.body.color);
-  console.log('Ubicación:', req.body.ubicacion);
-  console.log('Fecha/Hora:', req.body.fechaHora);
-  console.log('Tipo SOS Actual:', req.body.tipoSOSActual);
-  console.log('---');
   try {
     const { riderId, nombre, moto, color, ubicacion, fechaHora, tipo, tipoSOSActual, cancel } = req.body;
+    logger.location(riderId, {
+      lat: ubicacion?.lat,
+      lng: ubicacion?.lng,
+      tipo: tipo
+    });
     // Validar sin rechazar coordenadas 0,0
     const latValida = typeof ubicacion?.lat === 'number' && !Number.isNaN(ubicacion.lat);
     const lngValida = typeof ubicacion?.lng === 'number' && !Number.isNaN(ubicacion.lng);
@@ -120,9 +115,21 @@ app.post("/sos", async (req, res) => {
     const tipoSOSPrevio = (tipoPrevio && tipoPrevio !== 'normal' && tipoPrevio !== 'actualizacion') ? tipoPrevio : null;
     const candidatoSOS = tipoSOSPrevio || lastSosPrevio || memoriaValida || tipoSOSActual || null;
     // REGLA: 'actualizacion' NO cambia el tipo; solo actualiza ubicacion. Si hay un SOS previo, se mantiene.
-    const tipoAAlmacenar = (tipo === 'actualizacion')
-      ? (tipoSOSPrevio || lastSosPrevio || memoriaValida || tipoPrevio || 'normal')
-      : tipo;
+    
+    let tipoAAlmacenar;
+    if (tipo === 'actualizacion') {
+      // Si es una actualización, mantener el tipo actual
+      tipoAAlmacenar = tipoSOSPrevio || lastSosPrevio || memoriaValida || tipoPrevio || 'normal';
+    } else if (tipo === 'repartiendo') {
+      // Si es 'repartiendo', solo actualizar si no hay una alerta activa
+      const tieneAlertaActiva = ['robo', 'accidente'].includes(tipoSOSPrevio) ||
+        ['robo', 'accidente'].includes(lastSosPrevio) ||
+        (memoriaValida && ['robo', 'accidente'].includes(memoriaValida));
+      tipoAAlmacenar = tieneAlertaActiva ? (tipoSOSPrevio || lastSosPrevio || memoriaValida) : tipo;
+    } else {
+      // Para otros tipos (robo, accidente), siempre actualizar
+      tipoAAlmacenar = tipo;
+    }
 
     // Calcular lastSosTipo para mantener el tipo SOS histórico reciente
     let lastSosTipo = riders[riderId]?.lastSosTipo || null;
@@ -188,7 +195,7 @@ app.post("/sos", async (req, res) => {
     };
 
     console.log(`Ubicación recibida de ${nombre} (${riderId}):`, ubicacion, "tipo:", tipo, "almacenadoComo:", tipoAAlmacenar, "cancel:", cancel === true);
-    
+
     // Notificar a otros usuarios si es un nuevo SOS
     if (esNuevoSOS || esSOSInicial) {
       notificarSOSAOtrosUsuarios({
@@ -241,11 +248,49 @@ app.post("/sos", async (req, res) => {
         console.error('Error enviando push de SOS:', e);
       }
     }
-    
+
     res.json({ success: true });
   } catch (err) {
     console.error("Error recibiendo SOS:", err.message);
     res.status(500).json({ error: "No se pudo recibir la ubicación" });
+  }
+});
+
+// Agregar nuevo endpoint para ver logs
+app.get("/api/logs", authenticateToken, (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const logsDir = path.join(__dirname, 'logs');
+
+    // Leer archivos de log
+    const logFiles = fs.readdirSync(logsDir)
+      .filter(file => file.endsWith('.log'))
+      .map(file => {
+        const content = fs.readFileSync(path.join(logsDir, file), 'utf8');
+        return {
+          file,
+          content: content.split('\n').filter(Boolean) // Filtrar líneas vacías
+        };
+      });
+
+    res.json({ logs: logFiles });
+  } catch (err) {
+    logger.error(`Error leyendo logs: ${err.message}`);
+    res.status(500).json({ error: "Error al leer logs" });
+  }
+});
+
+// Endpoint para ver usuarios
+app.get("/api/users", authenticateToken, async (req, res) => {
+  try {
+    const db = require('./database');
+    const users = await db.getUsers();
+
+    res.json({ users });
+  } catch (err) {
+    logger.error(`Error obteniendo usuarios: ${err.message}`);
+    res.status(500).json({ error: "Error al obtener usuarios" });
   }
 });
 
@@ -259,7 +304,7 @@ app.get("/riders", (req, res) => {
     .filter((riderId) => {
       const r = riders[riderId];
       const tiempoInactivo = now - r.lastUpdate;
-      
+
       const sosActivo = r.tipo && r.tipo !== "normal" && r.tipo !== "actualizacion";
       // Mantener SOS activos visibles sin expirar por tiempo
       if (sosActivo) return true;
@@ -275,7 +320,7 @@ app.get("/riders", (req, res) => {
     .map((riderId) => {
       const r = riders[riderId];
       let tipoMostrar = r.tipo;
-      
+
       // Si es tipo "normal" y han pasado más de 2 minutos, no mostrar
       if (r.tipo === "normal" && (now - r.lastUpdate) > dosMinutos) {
         return null;
@@ -305,19 +350,19 @@ app.get("/alertas", (req, res) => {
   const alertasArray = Object.keys(riders)
     .filter((riderId) => {
       const r = riders[riderId];
-      
+
       // No mostrar alertas canceladas
       if (lastAlerts[riderId]?.tipo === 'normal' || r.tipo === 'normal') {
         return false;
       }
-      
+
       // Resto de la lógica de filtrado
       const esSOSReal = r.tipo && r.tipo !== "normal" && r.tipo !== "actualizacion";
       const esActualizacionConSOS = r.tipo === 'actualizacion' && !!r.lastSosTipo;
       const memoria = lastAlerts[riderId];
       const memoriaVigente = memoria && ((now - memoria.timestamp) <= ALERT_GRACE_MS);
       const lastSosReciente = !!r.lastSosTipo && ((now - r.lastUpdate) <= ALERT_GRACE_MS);
-      
+
       return esSOSReal || esActualizacionConSOS || memoriaVigente || lastSosReciente;
     })
     .map((riderId) => {
@@ -327,7 +372,7 @@ app.get("/alertas", (req, res) => {
       if ((tipoMostrar === 'actualizacion' || tipoMostrar === 'normal') && r.lastSosTipo) {
         tipoMostrar = r.lastSosTipo;
       }
-      
+
       return {
         riderId,
         nombre: r.nombre,
@@ -386,7 +431,7 @@ const authenticateToken = (req, res, next) => {
 app.use(`${API_PREFIX}/protected`, authenticateToken);
 
 const PORT = process.env.PORT || 10000;
-const HOST = process.env.HOST || '0.0.0.0'; 
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Crear servidor HTTP y adjuntar Socket.IO
 const server = http.createServer(app);
@@ -394,7 +439,7 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 // Inicializar chat en tiempo real
 require('./chat')(io);
-  
+
 server.listen(PORT, HOST, () => {
   console.log(`🚀 Servidor Rider SOS corriendo en http://${HOST}:${PORT}`);
   console.log(`📧 Sistema de emails configurado`);
