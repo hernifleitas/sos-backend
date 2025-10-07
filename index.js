@@ -250,43 +250,6 @@ app.post("/sos", async (req, res) => {
   }
 });
 
-// Agregar nuevo endpoint para ver logs
-app.get("/api/logs", authenticateToken, (req, res) => {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const logsDir = path.join(__dirname, 'logs');
-
-    // Leer archivos de log
-    const logFiles = fs.readdirSync(logsDir)
-      .filter(file => file.endsWith('.log'))
-      .map(file => {
-        const content = fs.readFileSync(path.join(logsDir, file), 'utf8');
-        return {
-          file,
-          content: content.split('\n').filter(Boolean) // Filtrar líneas vacías
-        };
-      });
-
-    res.json({ logs: logFiles });
-  } catch (err) {
-   
-    res.status(500).json({ error: "Error al leer logs" });
-  }
-});
-
-// Endpoint para ver usuarios
-app.get("/api/users", authenticateToken, async (req, res) => {
-  try {
-    const db = require('./database');
-    const users = await db.getUsers();
-
-    res.json({ users });
-  } catch (err) {
-    res.status(500).json({ error: "Error al obtener usuarios" });
-  }
-});
-
 // Endpoint para obtener riders activos
 app.get("/riders", (req, res) => {
   const now = Date.now();
