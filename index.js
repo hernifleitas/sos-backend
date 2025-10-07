@@ -5,7 +5,6 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
-const logger = require('./logger');
 const { router: authRoutes } = require('./api/auth');
 const chatRoutes = require('./api/chat');
 const notificationsRoutes = require('./api/notifications');
@@ -45,7 +44,7 @@ app.get('/premium/failure', (req, res) => {
 app.get('/premium/pending', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/premium/pending.html'));
 });
-logger.info("Iniciando servidor...");
+
 
 // Guardar info de riders en memoria
 let riders = {};
@@ -74,11 +73,6 @@ const notificarSOSAOtrosUsuarios = (sosData) => {
 app.post("/sos", async (req, res) => {
   try {
     const { riderId, nombre, moto, color, ubicacion, fechaHora, tipo, tipoSOSActual, cancel } = req.body;
-    logger.location(riderId, {
-      lat: ubicacion?.lat,
-      lng: ubicacion?.lng,
-      tipo: tipo
-    });
     // Validar sin rechazar coordenadas 0,0
     const latValida = typeof ubicacion?.lat === 'number' && !Number.isNaN(ubicacion.lat);
     const lngValida = typeof ubicacion?.lng === 'number' && !Number.isNaN(ubicacion.lng);
@@ -276,7 +270,7 @@ app.get("/api/logs", authenticateToken, (req, res) => {
 
     res.json({ logs: logFiles });
   } catch (err) {
-    logger.error(`Error leyendo logs: ${err.message}`);
+   
     res.status(500).json({ error: "Error al leer logs" });
   }
 });
@@ -289,7 +283,6 @@ app.get("/api/users", authenticateToken, async (req, res) => {
 
     res.json({ users });
   } catch (err) {
-    logger.error(`Error obteniendo usuarios: ${err.message}`);
     res.status(500).json({ error: "Error al obtener usuarios" });
   }
 });

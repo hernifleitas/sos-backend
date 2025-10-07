@@ -4,7 +4,6 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const database = require('../database');
 const emailService = require('../email');
-const logger = require('../logger');
 
 class AuthService {
   constructor() {
@@ -476,17 +475,6 @@ class AuthService {
         try {
           await emailService.sendApprovalEmail(user);
           console.log(`Email de aprobación enviado a ${user.email}`);
-          logger.approvedUser({
-            id: user.id,
-            nombre: user.nombre,
-            email: user.email,
-            moto: user.moto,
-            color: user.color,
-            telefono: user.telefono,
-            role: user.role,
-            created_at: user.created_at,
-            status: 'active' // O el estado que corresponda
-          });
         } catch (emailError) {
           console.error('Error enviando email de aprobación:', emailError);
         }
