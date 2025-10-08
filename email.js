@@ -10,7 +10,7 @@ class EmailService {
   // Enviar email de reset de contraseña
   async sendPasswordResetEmail(user, newPassword) {
     const emailData = {
-      sender: { name: 'Rider SOS', email: process.env.EMAIL_FROM || 'noreply@ridersos.com' },
+      sender: { name:process.env.EMAIL_NAME || 'Rider SOS', email: process.env.EMAIL_FROM},
       to: [{ email: user.email, name: user.nombre }],
       subject: '🔐 Nueva Contraseña - Rider SOS',
       htmlContent: this.generatePasswordResetEmailHTML(user, newPassword),
@@ -30,7 +30,7 @@ class EmailService {
   // Enviar email de bienvenida
   async sendWelcomeEmail(user) {
     const emailData = {
-      sender: { name: 'Rider SOS', email: process.env.EMAIL_FROM || 'noreply@ridersos.com' },
+      sender: { name:process.env.EMAIL_NAME || 'Rider SOS', email: process.env.EMAIL_FROM},
       to: [{ email: user.email, name: user.nombre }],
       subject: '🚀 ¡Bienvenido a Rider SOS!',
       htmlContent: this.generateWelcomeEmailHTML(user),
@@ -53,7 +53,7 @@ class EmailService {
     const resetLink = `${appScheme}://reset-password?token=${resetToken}`;
 
     const emailData = {
-      sender: { name: 'Rider SOS', email: process.env.EMAIL_FROM || 'noreply@ridersos.com' },
+      sender: { name:process.env.EMAIL_NAME || 'Rider SOS', email: process.env.EMAIL_FROM},
       to: [{ email: user.email, name: user.nombre }],
       subject: 'Rider SOS - Cambiar Contraseña',
       htmlContent: this.generatePasswordResetLinkEmailHTML(user, resetLink),
@@ -73,7 +73,7 @@ class EmailService {
   // Enviar email de aprobación
   async sendApprovalEmail(user) {
     const emailData = {
-      sender: { name: 'Rider SOS', email: process.env.EMAIL_FROM || 'noreply@ridersos.com' },
+      sender: { name:process.env.EMAIL_NAME || 'Rider SOS', email: process.env.EMAIL_FROM},
       to: [{ email: user.email, name: user.nombre }],
       subject: '✅ ¡Tu cuenta ha sido aprobada! - Rider SOS',
       htmlContent: this.generateApprovalEmailHTML(user),
