@@ -1,136 +1,114 @@
-  const nodemailer = require('nodemailer');
-  require('dotenv').config();
-  class EmailService {
-    constructor() {
-      this.transporter = null;
-      this.init();
+require('dotenv').config();
+const SibApiV3Sdk = require('sib-api-v3-sdk');
+
+class EmailService {
+  constructor() {
+    this.client = new SibApiV3Sdk.TransactionalEmailsApi();
+    SibApiV3Sdk.ApiClient.instance.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
+  }
+
+  // Enviar email de reset de contraseña
+  async sendPasswordResetEmail(user, newPassword) {
+    const emailData = {
+      sender: { name: 'Rider SOS', email: process.env.EMAIL_FROM || 'noreply@ridersos.com' },
+      to: [{ email: user.email, name: user.nombre }],
+      subject: '🔐 Nueva Contraseña - Rider SOS',
+      htmlContent: this.generatePasswordResetEmailHTML(user, newPassword),
+      textContent: this.generatePasswordResetEmailText(user, newPassword)
+    };
+
+    try {
+      const result = await this.client.sendTransacEmail(emailData);
+      console.log('Email de reset de contraseña enviado:', result.messageId);
+      return result;
+    } catch (error) {
+      console.error('Error enviando email de reset:', error);
+      throw error;
     }
-    init() {
-      this.transporter = nodemailer.createTransport({
-        host: 'smtp-relay.brevo.com',
-        port: 587,
-        secure: false, // true para 465
-        auth: {
-          user: process.env.BREVO_SMTP_USER, 
-          pass: process.env.BREVO_SMTP_KEY,
-        },
+  }
 
-        connectionTimeout: 10000
-      });
+  // Enviar email de bienvenida
+  async sendWelcomeEmail(user) {
+    const emailData = {
+      sender: { name: 'Rider SOS', email: process.env.EMAIL_FROM || 'noreply@ridersos.com' },
+      to: [{ email: user.email, name: user.nombre }],
+      subject: '🚀 ¡Bienvenido a Rider SOS!',
+      htmlContent: this.generateWelcomeEmailHTML(user),
+      textContent: this.generateWelcomeEmailText(user)
+    };
 
-      // Verificar la configuración
-      this.transporter.verify((error, success) => {
-        if (error) {
-          console.error('Error configurando email:', error);
-        } else {
-          console.log('✅ Servidor de email listo para enviar mensajes');
-        }
-      });
+    try {
+      const result = await this.client.sendTransacEmail(emailData);
+      console.log('Email de bienvenida enviado:', result.messageId);
+      return result;
+    } catch (error) {
+      console.error('Error enviando email de bienvenida:', error);
+      throw error;
     }
+  }
 
-    // Enviar email de reset de contraseña
-    async sendPasswordResetEmail(user, newPassword) {
-      try {
-        const mailOptions = {
-          from: process.env.EMAIL_FROM,
-          to: user.email,
-          subject: '🔐 Nueva Contraseña - Rider SOS',
-          html: this.generatePasswordResetEmailHTML(user, newPassword),
-          text: this.generatePasswordResetEmailText(user, newPassword)
-        };
+  // Enviar email con link de reset de contraseña
+  async sendPasswordResetLinkEmail(user, resetToken) {
+    const appScheme = process.env.APP_SCHEME || 'ridersos';
+    const resetLink = `${appScheme}://reset-password?token=${resetToken}`;
 
-        const result = await this.transporter.sendMail(mailOptions);
-        console.log('Email de reset de contraseña enviado:', result.messageId);
-        return result;
-      } catch (error) {
-        console.error('Error enviando email de reset:', error);
-        throw error;
-      }
+    const emailData = {
+      sender: { name: 'Rider SOS', email: process.env.EMAIL_FROM || 'noreply@ridersos.com' },
+      to: [{ email: user.email, name: user.nombre }],
+      subject: 'Rider SOS - Cambiar Contraseña',
+      htmlContent: this.generatePasswordResetLinkEmailHTML(user, resetLink),
+      textContent: this.generatePasswordResetLinkEmailText(user, resetLink)
+    };
+
+    try {
+      const result = await this.client.sendTransacEmail(emailData);
+      console.log('Email de reset con link enviado:', result.messageId);
+      return result;
+    } catch (error) {
+      console.error('Error enviando email de reset con link:', error);
+      throw error;
     }
+  }
 
-    // Enviar email de bienvenida
-    async sendWelcomeEmail(user) {
-      try {
-        const mailOptions = {
-          from: process.env.EMAIL_FROM || 'Rider SOS <noreply@ridersos.com>',
-          to: user.email,
-          subject: '🚀 ¡Bienvenido a Rider SOS!',
-          html: this.generateWelcomeEmailHTML(user),
-          text: this.generateWelcomeEmailText(user)
-        };
+  // Enviar email de aprobación
+  async sendApprovalEmail(user) {
+    const emailData = {
+      sender: { name: 'Rider SOS', email: process.env.EMAIL_FROM || 'noreply@ridersos.com' },
+      to: [{ email: user.email, name: user.nombre }],
+      subject: '✅ ¡Tu cuenta ha sido aprobada! - Rider SOS',
+      htmlContent: this.generateApprovalEmailHTML(user),
+      textContent: this.generateApprovalEmailText(user)
+    };
 
-        const result = await this.transporter.sendMail(mailOptions);
-        console.log('Email de bienvenida enviado:', result.messageId);
-        return result;
-      } catch (error) {
-        console.error('Error enviando email de bienvenida:', error);
-        throw error;
-      }
+    try {
+      const result = await this.client.sendTransacEmail(emailData);
+      console.log('Email de aprobación enviado:', result.messageId);
+      return result;
+    } catch (error) {
+      console.error('Error enviando email de aprobación:', error);
+      throw error;
     }
+  }
 
-    // Enviar email con link de reset de contraseña
-    async sendPasswordResetLinkEmail(user, resetToken) {
-      try {
-        // FORZAR deep link a la app SIEMPRE (evitar https://localhost u otras webs)
-        const appScheme = process.env.APP_SCHEME || 'ridersos';
-        const resetLink = `${appScheme}://reset-password?token=${resetToken}`;
-        
-        const mailOptions = {
-          from: process.env.EMAIL_FROM || 'Rider SOS <noreply@ridersos.com>',
-          to: user.email,
-          subject: 'Rider SOS',
-          html: this.generatePasswordResetLinkEmailHTML(user, resetLink),
-          text: this.generatePasswordResetLinkEmailText(user, resetLink)
-        };
+  // Enviar email de rechazo
+  async sendRejectionEmail(user) {
+    const emailData = {
+      sender: { name: 'Rider SOS', email: process.env.EMAIL_FROM || 'noreply@ridersos.com' },
+      to: [{ email: user.email, name: user.nombre }],
+      subject: '❌ Registro no aprobado - Rider SOS',
+      htmlContent: this.generateRejectionEmailHTML(user),
+      textContent: this.generateRejectionEmailText(user)
+    };
 
-        const result = await this.transporter.sendMail(mailOptions);
-        console.log('Email de reset de contraseña enviado:', result.messageId);
-        return result;
-      } catch (error) {
-        console.error('Error enviando email de reset:', error);
-        throw error;
-      }
+    try {
+      const result = await this.client.sendTransacEmail(emailData);
+      console.log('Email de rechazo enviado:', result.messageId);
+      return result;
+    } catch (error) {
+      console.error('Error enviando email de rechazo:', error);
+      throw error;
     }
-
-    // Enviar email de aprobación de cuenta
-    async sendApprovalEmail(user) {
-      try {
-        const mailOptions = {
-          from: process.env.EMAIL_FROM || 'Rider SOS <noreply@ridersos.com>',
-          to: user.email,
-          subject: '✅ ¡Tu cuenta ha sido aprobada! - Rider SOS',
-          html: this.generateApprovalEmailHTML(user),
-          text: this.generateApprovalEmailText(user)
-        };
-
-        const result = await this.transporter.sendMail(mailOptions);
-        console.log('Email de aprobación enviado:', result.messageId);
-        return result;
-      } catch (error) {
-        console.error('Error enviando email de aprobación:', error);
-        throw error;
-      }
-    }
-
-    // Enviar email de rechazo de cuenta
-    async sendRejectionEmail(user) {
-      try {
-        const mailOptions = {
-          from: process.env.EMAIL_FROM || 'Rider SOS <noreply@ridersos.com>',
-          to: user.email,
-          subject: '❌ Registro no aprobado - Rider SOS',
-          html: this.generateRejectionEmailHTML(user),
-          text: this.generateRejectionEmailText(user)
-        };
-
-        const result = await this.transporter.sendMail(mailOptions);
-        console.log('Email de rechazo enviado:', result.messageId);
-        return result;
-      } catch (error) {
-        console.error('Error enviando email de rechazo:', error);
-        throw error;
-      }
-    }
+  }
 
     // Generar HTML del email de reset de contraseña
     generatePasswordResetEmailHTML(user, newPassword) {
