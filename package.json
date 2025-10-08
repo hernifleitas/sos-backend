@@ -35,7 +35,8 @@
     "mercadopago": "^2.9.0",
     "ngrok": "^5.0.0-beta.2",
     "node-fetch": "^3.3.2",
-    "nodemailer": "^6.9.7",
+    "nodemailer": "^6.10.1",
+    "nodemailer-sendinblue-transport": "^2.0.1",
     "pg": "^8.11.5",
     "socket.io": "^4.8.1"
   }
