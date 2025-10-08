@@ -14,6 +14,8 @@
           user: process.env.BREVO_SMTP_USER, 
           pass: process.env.BREVO_SMTP_KEY,
         },
+
+        connectionTimeout: 10000
       });
 
       // Verificar la configuración
