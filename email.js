@@ -73,7 +73,7 @@ class EmailService {
   // Enviar email de aprobación
   async sendApprovalEmail(user) {
     const emailData = {
-      sender: { name:process.env.EMAIL_NAME || 'Rider SOS', email: process.env.EMAIL_FROM},
+      sender: { name:process.env.EMAIL_NAME || 'Rider SOS delivery', email: process.env.EMAIL_FROM},
       to: [{ email: user.email, name: user.nombre }],
       subject: '✅ ¡Tu cuenta ha sido aprobada! - Rider SOS',
       htmlContent: this.generateApprovalEmailHTML(user),
@@ -93,7 +93,7 @@ class EmailService {
   // Enviar email de rechazo
   async sendRejectionEmail(user) {
     const emailData = {
-      sender: { name: 'Rider SOS', email: process.env.EMAIL_FROM || 'noreply@ridersos.com' },
+      sender: { name: process.env.EMAIL_NAME || 'Rider SOS delivery', email: process.env.EMAIL_FROM },
       to: [{ email: user.email, name: user.nombre }],
       subject: '❌ Registro no aprobado - Rider SOS',
       htmlContent: this.generateRejectionEmailHTML(user),

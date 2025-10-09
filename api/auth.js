@@ -494,36 +494,38 @@ class AuthService {
   }
 
   async rejectUser(userId) {
+    console.log('rejectUser iniciado para userId:', userId);
+  
     try {
-      const result = await database.rejectUser(userId);
-      if (result.changes === 0) {
-        return {
-          success: false,
-          message: 'Usuario no encontrado'
-        };
-      }
-
-      // Obtener datos del usuario para enviar email
+      // 1️⃣ Obtener datos del usuario antes de marcarlo como rechazado
       const user = await database.findUserById(userId);
-      if (user) {
-        try {
-          await emailService.sendRejectionEmail(user);
-          console.log(`Email de rechazo enviado a ${user.email}`);
-        } catch (emailError) {
-          console.error('Error enviando email de rechazo:', emailError);
-        }
+      if (!user) {
+        console.log('Usuario no encontrado antes de intentar rechazar');
+        return { success: false, message: 'Usuario no encontrado' };
       }
-
-      return {
-        success: true,
-        message: 'Usuario rechazado correctamente'
-      };
+      console.log('Usuario encontrado:', user);
+  
+      // 2️⃣ Marcar al usuario como rechazado en la base de datos
+      const result = await database.rejectUser(userId);
+      console.log('Resultado de rejectUser en DB:', result);
+  
+      if (result.changes === 0) {
+        console.log('No se pudo marcar usuario como rechazado');
+        return { success: false, message: 'Usuario no encontrado o no modificado' };
+      }
+  
+      // 3️⃣ Enviar email de rechazo usando los datos obtenidos antes
+      try {
+        await emailService.sendRejectionEmail(user);
+        console.log(`Email de rechazo enviado a ${user.email}`);
+      } catch (emailError) {
+        console.error('Error enviando email de rechazo:', emailError);
+      }
+  
+      return { success: true, message: 'Usuario rechazado correctamente' };
     } catch (error) {
       console.error('Error rechazando usuario:', error);
-      return {
-        success: false,
-        message: 'Error interno del servidor'
-      };
+      return { success: false, message: 'Error interno del servidor' };
     }
   }
 
