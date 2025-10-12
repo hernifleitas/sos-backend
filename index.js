@@ -18,11 +18,6 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 
-//middleware de debugging 
-//app.use((req, res, next) => {
-// console.log(`${req.method} ${req.url} - ${new Date().toISOString()}`);
-//next();
-//})
 
 // Servir archivos estáticos de premium
 app.use('/premium', express.static(path.join(__dirname, 'public/premium')));
@@ -187,7 +182,7 @@ app.post("/sos", async (req, res) => {
       appActive: tipoAAlmacenar === "normal" ? true : riders[riderId]?.appActive || false,
     };
 
-    console.log(`Ubicación recibida de ${nombre} (${riderId}):`, ubicacion, "tipo:", tipo, "almacenadoComo:", tipoAAlmacenar, "cancel:", cancel === true);
+
     const esNotificable = (esNuevoSOS || esSOSInicial) && 
                      !esActualizacion && 
                      tipoAAlmacenar && 
@@ -406,6 +401,8 @@ const HOST = process.env.HOST || '0.0.0.0';
 // Crear servidor HTTP y adjuntar Socket.IO
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
+
+app.set('io', io);
 
 // Inicializar chat en tiempo real
 require('./chat')(io);

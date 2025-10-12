@@ -18,6 +18,74 @@ router.get('/history', authService.authenticateToken.bind(authService), async (r
   }
 });
 
+
+router.post('/message', authService.authenticateToken.bind(authService), async (req, res) => {
+  try {
+    const { content, room = 'global' } = req.body;
+    const userId = req.user.id; // El usuario autenticado
+
+    // Validar el contenido del mensaje
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, message: 'El mensaje no puede estar vacío' });
+    }
+
+    // Verificar si el usuario tiene permisos (Premium o Admin)
+    const isPremium = await database.isPremium(userId);
+    const isAdmin = await database.isAdmin(userId);
+    if (!isPremium && !isAdmin) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Se requiere suscripción Premium para enviar mensajes' 
+      });
+    }
+
+    // Obtener información del usuario
+    const userInfo = await database.findUserById(userId);
+    if (!userInfo) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    }
+
+    // Guardar el mensaje en la base de datos
+    const messageId = await database.addMessage(userId, content, room);
+    const created_at = new Date().toISOString();
+
+    const message = {
+      id: messageId,
+      user_id: userId,
+      nombre: userInfo.nombre || 'Usuario',
+      moto: userInfo.moto || 'No especificado',
+      color: userInfo.color || 'No especificado',
+      content,
+      room,
+      created_at
+    };
+
+    // Emitir a través de WebSocket si está disponible
+    if (req.app.get('io')) {
+      req.app.get('io').of('/chat').to(room).emit('message:new', message);
+    }
+
+    // Enviar notificaciones push a los demás usuarios
+    try {
+      const notifications = require('../notifications');
+      const body = `${message.nombre}: ${content.slice(0, 60)}${content.length > 60 ? '…' : ''}`;
+      await notifications.sendToAllExcept(userId, '💬 Nuevo mensaje', body, {
+        kind: 'chat',
+        room,
+        messageId: message.id,
+      });
+    } catch (notifError) {
+      console.error('Error enviando notificaciones push:', notifError);
+      // No fallar la operación principal si fallan las notificaciones
+    }
+
+    res.status(201).json({ success: true, message });
+  } catch (error) {
+    console.error('Error enviando mensaje:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
+
 // DELETE /chat/message/:id (solo admins)
 router.delete('/message/:id', authService.authenticateToken.bind(authService), authService.requireAdmin.bind(authService), async (req, res) => {
   try {
