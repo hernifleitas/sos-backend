@@ -1,7 +1,7 @@
 {
   "name": "sos-backend",
   "version": "1.0.0",
-  "description": "SOS DELIVERY RIDER ",
+  "description": "Rider SOS delivery ",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -23,7 +23,9 @@
     "node": "18.x"
   },
   "dependencies": {
+    "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-firebase/messaging": "^23.4.1",
     "axios": "^1.11.0",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",

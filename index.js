@@ -40,6 +40,10 @@ app.get('/premium/pending', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/premium/pending.html'));
 });
 
+app.get('/politica-privacidad', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/politica-privacidad.html'));
+});
+
 
 // Guardar info de riders en memoria
 let riders = {};
@@ -146,17 +150,14 @@ app.post("/sos", async (req, res) => {
           riders[riderId].lastSosTipo = null;
           riders[riderId].tipo = 'normal';
         }
-        console.log(`[CANCEL] Cancel explícito para ${riderId}. Limpiando alerta.`);
       } else if (memoriaVigente) {
         // Ignorar 'normal' no intencional durante gracia
         if (riders[riderId]) {
           riders[riderId].tipo = riders[riderId].lastSosTipo || memoria?.tipo || 'actualizacion';
         }
-        console.log(`[IGNORE] 'normal' sin cancel ignorado para ${riderId} (gracia activa).`);
       } else {
         // No hay memoria vigente: aceptar normal
         delete lastAlerts[riderId];
-        console.log(`[NORMAL] Sin memoria vigente, se acepta 'normal' para ${riderId}.`);
       }
     } else if (tipo === 'actualizacion') {
       // Mantener fresh la ubicación y hora en memoria durante la gracia; si viene tipoSOSActual, también refrescar tipo
