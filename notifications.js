@@ -1,56 +1,116 @@
-// notifications.js
-// Asegurar fetch en Node (Render puede no tener global fetch disponible)
-let fetchFn = global.fetch;
-if (typeof fetchFn !== 'function') {
-  // Carga dinámica para compatibilidad con CJS en Node >=14
+const database = require('./database');
+
+// Mejorar la compatibilidad con fetch
+let fetchFn;
+if (typeof global.fetch === 'function') {
+  fetchFn = global.fetch;
+} else {
   fetchFn = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 }
-
-const database = require('./database');
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
 async function sendPush(tokens, title, body, data = {}) {
-  if (!tokens || tokens.length === 0) return { success: true, sent: 0 };
-  const chunks = [];
-  const CHUNK_SIZE = 90; // Expo recomienda ~100 por request
-  for (let i = 0; i < tokens.length; i += CHUNK_SIZE) {
-    chunks.push(tokens.slice(i, i + CHUNK_SIZE));
+  if (!tokens?.length) {
+    console.log('No hay tokens para enviar notificación');
+    return { success: true, sent: 0 };
   }
 
-  let sent = 0;
-  for (const chunk of chunks) {
-    try {
-      const messages = chunk.map((to) => ({ to, title, body, data, sound: 'default', priority: 'high' }));
-      const res = await fetchFn(EXPO_PUSH_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(messages),
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        console.error('Expo push error:', res.status, txt);
-        continue;
-      }
-      sent += chunk.length;
-    } catch (e) {
-      console.error('Error enviando push a Expo:', e?.message || e);
-    }
+  // Filtrar tokens inválidos
+  const validTokens = tokens.filter(token => 
+    token && typeof token === 'string' && token.startsWith('ExponentPushToken')
+  );
+
+  if (validTokens.length === 0) {
+    console.error('No hay tokens válidos para enviar');
+    return { success: false, sent: 0, error: 'No valid tokens' };
   }
-  return { success: true, sent };
+
+  console.log(`Enviando notificación a ${validTokens.length} dispositivos`);
+
+  try {
+    const messages = validTokens.map(token => ({
+      to: token,
+      sound: 'default',
+      title,
+      body,
+      data,
+      priority: 'high',
+      _displayInForeground: true
+    }));
+
+    const response = await fetchFn(EXPO_PUSH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip, deflate',
+      },
+      body: JSON.stringify(messages),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error en la respuesta de Expo:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      return { 
+        success: false, 
+        sent: 0, 
+        error: `HTTP ${response.status}: ${response.statusText}`,
+        details: errorText
+      };
+    }
+
+    const result = await response.json();
+    console.log('Respuesta de Expo:', JSON.stringify(result, null, 2));
+    
+    return {
+      success: true,
+      sent: validTokens.length,
+      details: result
+    };
+
+  } catch (error) {
+    console.error('Error enviando notificación:', error);
+    return { 
+      success: false, 
+      sent: 0, 
+      error: error.message,
+      stack: error.stack 
+    };
+  }
 }
 
 async function sendToAllExcept(userId, title, body, data = {}) {
   try {
+    console.log(`Obteniendo tokens para todos excepto usuario: ${userId}`);
     const tokens = await database.getAllTokensExcept(userId);
+    console.log(`Tokens encontrados: ${tokens?.length || 0}`);
+    
+    if (!tokens?.length) {
+      console.warn('No se encontraron tokens para enviar notificaciones');
+      return { success: false, error: 'No tokens found' };
+    }
+
     return await sendPush(tokens, title, body, data);
-  } catch (e) {
-    console.error('Error obteniendo tokens para push:', e?.message || e);
-    return { success: false };
+  } catch (error) {
+    console.error('Error en sendToAllExcept:', {
+      error: error.message,
+      stack: error.stack,
+      userId
+    });
+    return { 
+      success: false, 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    };
   }
 }
 
 module.exports = {
   sendPush,
-  sendToAllExcept,
+  sendToAllExcept
 };
