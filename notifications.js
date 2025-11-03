@@ -64,15 +64,6 @@ async function sendPush(tokens, title, body, data = {}) {
       };
     }
 
-    const result = await response.json();
-    console.log('Respuesta de Expo:', JSON.stringify(result, null, 2));
-    
-    return {
-      success: true,
-      sent: validTokens.length,
-      details: result
-    };
-
   } catch (error) {
     console.error('Error enviando notificación:', error);
     return { 
@@ -86,12 +77,9 @@ async function sendPush(tokens, title, body, data = {}) {
 
 async function sendToAllExcept(userId, title, body, data = {}) {
   try {
-    console.log(`Obteniendo tokens para todos excepto usuario: ${userId}`);
     const tokens = await database.getAllTokensExcept(userId);
-    console.log(`Tokens encontrados: ${tokens?.length || 0}`);
     
     if (!tokens?.length) {
-      console.warn('No se encontraron tokens para enviar notificaciones');
       return { success: false, error: 'No tokens found' };
     }
 
