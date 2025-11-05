@@ -827,7 +827,7 @@ router.get('/admin/all-users',
         `SELECT id, nombre, email, telefono, moto, color, role, 
                 is_active, created_at, premium_expires_at 
          FROM users 
-         WHERE is_active = 1
+         WHERE is_active = true
          ORDER BY created_at DESC`
       );
 
