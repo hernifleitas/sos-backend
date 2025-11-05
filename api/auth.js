@@ -877,7 +877,7 @@ router.post('/admin/make-premium/:userId',
           INSERT INTO payments (
             user_id, 
             preference_id, 
-            payment_id,
+            mercadopago_payment_id,
             amount,
             currency,
             status,
@@ -894,16 +894,16 @@ router.post('/admin/make-premium/:userId',
           'approved'
         ]);
 
-        // 3. Crear suscripción
+        // 3. Crear suscripción (sin payment_id ya que no existe esa columna)
         await client.query(`
           INSERT INTO premium_subscriptions (
             user_id, 
             start_date, 
             end_date, 
             is_active,
-            payment_id
+            mercadopago_payment_id
           ) VALUES ($1, $2, $3, true, $4)
-        `, [userId, startDate, endDate, paymentResult.rows[0].id]);
+        `, [userId, startDate, endDate, 'ADMIN-PAY-' + Date.now()]);
 
         await client.query('COMMIT');
 
@@ -924,7 +924,8 @@ router.post('/admin/make-premium/:userId',
       console.error('Error haciendo premium al usuario:', error);
       res.status(500).json({
         success: false,
-        message: 'Error interno del servidor'
+        message: 'Error interno del servidor',
+        error: error.message
       });
     }
   });
