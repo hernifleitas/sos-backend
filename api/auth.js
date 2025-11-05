@@ -8,7 +8,7 @@ const emailService = require('../email');
 class AuthService {
   constructor() {
     this.jwtSecret = process.env.JWT_SECRET
-    this.jwtExpiresIn = '5m'; // Token válido por 7 días
+    this.jwtExpiresIn = '7d'; // Token válido por 7 días
   }
 
   // Helper: verificar si es Premium (o Admin)
