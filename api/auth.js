@@ -7,7 +7,7 @@ const emailService = require('../email');
 
 class AuthService {
   constructor() {
-    this.jwtSecret = process.env.JWT_SECRET || 'rider-sos-secret-key-2024';
+    this.jwtSecret = process.env.JWT_SECRET
     this.jwtExpiresIn = '7d'; // Token válido por 7 días
   }
 
