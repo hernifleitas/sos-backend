@@ -10,6 +10,7 @@ const chatRoutes = require('./api/chat');
 const notificationsRoutes = require('./api/notifications');
 const notifications = require('./notifications');
 const premiumRoutes = require('./api/premium');
+const zonasPeligrosasRouter = require('./api/zonas-peligrosas');
 const database = require('./database');
 
 const app = express();
@@ -17,6 +18,7 @@ app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
+app.use('/zonas-peligrosas', zonasPeligrosasRouter);
 
 
 // Servir archivos estáticos de premium
