@@ -1,4 +1,7 @@
 // GET /api/zonas-peligrosas
+const express = require('express');
+const router = express.Router();
+
 router.get('/', (req, res) => {
   const zonas = [
     {
@@ -27,3 +30,5 @@ router.get('/', (req, res) => {
   ];
   res.json({ success: true, zonas });
 });
+
+module.exports = router;
