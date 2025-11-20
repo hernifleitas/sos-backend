@@ -18,7 +18,7 @@ app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
-app.use('/zonas-peligrosas', zonasPeligrosasRoutes);
+app.use('/api/zonas-peligrosas', zonasPeligrosasRoutes);
 
 
 // Servir archivos estáticos de premium
