@@ -1,5 +1,5 @@
 // GET /api/zonas-peligrosas
-router.get('/zonas-peligrosas', (req, res) => {
+router.get('/', (req, res) => {
   const zonas = [
     {
       id: 1,
