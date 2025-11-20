@@ -17,7 +17,7 @@ router.get('/zonas-peligrosas', (req, res) => {
       id: 2,
       nombre: 'Zona comercial concurrida',
       descripcion: '<strong>Precaución</strong><br>Alto tráfico y riesgo de arrebatos.',
-      color: '#F39C12', // Naranja
+      color: '#F39C12',
       coordenadas: [
         [-34.8150, -58.4700],
         [-34.8160, -58.4680],
