@@ -187,8 +187,24 @@ coordenadas: [
 ]
     },
 
+
+    {
+      id: 9,
+      nombre: 'Zona peligrosa',
+      descripcion: 'Zona con reportes de robos frecuentes.',
+      tipo: 'peligrosa',
+coordenadas: [
+  [-34.801824163054725, -58.479524403086],
+  [-34.79330956615648, -58.464018357272394],
+  [-34.77829189566807, -58.47482557462604],
+  [-34.78555862588081, -58.49162473176496],
+  [-34.801824163054725, -58.479524403086]
+]
+    },
+
   ]; 
   res.json({ success: true, zonas });
 });
+
 
 module.exports = router;
