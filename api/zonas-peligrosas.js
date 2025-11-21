@@ -9,12 +9,12 @@ router.get('/', (req, res) => {
       nombre: 'Zona peligrosa',
       descripcion: 'Zona con reportes de robos frecuentes.',
       tipo: 'peligrosa',
-      coordenadas: [
-     [-34.82574, -58.45925],  
-     [-34.82574, -58.45885],  
-     [-34.82605, -58.45885],
-     [-34.82605, -58.45925]
-      ]
+    coordenadas: [
+  [-34.82530, -58.45955],
+  [-34.82530, -58.45850],
+  [-34.82640, -58.45850],
+  [-34.82640, -58.45955]
+]
     },
     // Local sin efectivo - Mr Tasty Montegrande
     {
