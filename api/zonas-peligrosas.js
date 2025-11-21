@@ -57,7 +57,6 @@ coordenadas: [
         [-34.81520, -58.46895]
       ]
     },
-
     // Zona peligrosa
     {
       id: 5,
@@ -108,9 +107,23 @@ coordenadas: [
 ]
     },
 
+     // Local No devuelve efectivo - Mr Tasty Montegrande
+    {
+      id: 8,
+      nombre: 'Helados kupanaka',
+      descripcion: 'Local que no devuelve efectivo a repartidores',
+      tipo: 'sin-efectivo',
+    coordenadas: [
+  [-34.81888, -58.47378],  // Noroeste
+  [-34.81888, -58.47342],  // Noreste
+  [-34.81898, -58.47342],  // Sureste
+  [-34.81898, -58.47378]   // Suroeste
+]
+    },
+
   ];
 
-
+  
   res.json({ success: true, zonas });
 });
 
