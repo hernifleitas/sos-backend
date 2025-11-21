@@ -1,3 +1,6 @@
+const express = require('express');
+const router = express.Router();
+
 router.get('/', (req, res) => {
   const zonas = [
     // Zona peligrosa
@@ -29,3 +32,5 @@ router.get('/', (req, res) => {
   ];
   res.json({ success: true, zonas });
 });
+
+module.exports = router;
