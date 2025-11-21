@@ -1,34 +1,31 @@
-// GET /api/zonas-peligrosas
-const express = require('express');
-const router = express.Router();
-
 router.get('/', (req, res) => {
   const zonas = [
+    // Zona peligrosa
     {
       id: 1,
-      nombre: 'Cruce peligroso',
-      descripcion: '<strong>¡Atención!</strong><br>Zona con reportes de robos frecuentes en semáforos.',
-      color: '#E74C3C', // Rojo
+      nombre: 'Zona peligrosa',
+      descripcion: 'Zona con reportes de robos frecuentes.',
+      tipo: 'peligrosa',
       coordenadas: [
-        [-34.8215, -58.4680],
-        [-34.8225, -58.4660],
-        [-34.8205, -58.4640],
-        [-34.8195, -58.4670]
+        [-34.82574352965056, -58.45919989083198],
+        [-34.82574352965056, -58.45889989083198], 
+        [-34.82604352965056, -58.45889989083198], 
+        [-34.82604352965056, -58.45919989083198] 
       ]
     },
+    // Local sin efectivo - Mr Tasty Montegrande
     {
       id: 2,
-      nombre: 'Zona comercial concurrida',
-      descripcion: '<strong>Precaución</strong><br>Alto tráfico y riesgo de arrebatos.',
-      color: '#F39C12',
+      nombre: 'Mr Tasty',
+      descripcion: 'Local que no devuelve efectivo a repartidores',
+      tipo: 'sin-efectivo',
       coordenadas: [
-        [-34.8150, -58.4700],
-        [-34.8160, -58.4680],
-        [-34.8140, -58.4660]
+        [-34.81510, -58.46895],
+        [-34.81510, -58.46885],
+        [-34.81520, -58.46885],
+        [-34.81520, -58.46895]
       ]
     }
   ];
   res.json({ success: true, zonas });
 });
-
-module.exports = router;
