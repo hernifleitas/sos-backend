@@ -5,6 +5,20 @@ router.get('/', (req, res) => {
   const zonas = [
     // Zona peligrosa
     {
+      id: 2,
+      nombre: 'Zona peligrosa',
+      descripcion: 'Zona con reportes de robos frecuentes.',
+      tipo: 'peligrosa',
+coordenadas: [
+  [-34.79420, -58.44880],
+  [-34.79420, -58.44650],
+  [-34.79620, -58.44650],
+  [-34.79620, -58.44880]
+]
+    },
+
+    // Zona peligrosa
+    {
       id: 1,
       nombre: 'Zona peligrosa',
       descripcion: 'Zona con reportes de robos frecuentes.',
@@ -16,9 +30,9 @@ router.get('/', (req, res) => {
   [-34.82640, -58.45955]
 ]
     },
-    // Local sin efectivo - Mr Tasty Montegrande
+    // Local No devuelve efectivo - Mr Tasty Montegrande
     {
-      id: 2,
+      id: 3,
       nombre: 'Mr Tasty',
       descripcion: 'Local que no devuelve efectivo a repartidores',
       tipo: 'sin-efectivo',
