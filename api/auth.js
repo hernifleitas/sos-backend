@@ -783,16 +783,19 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-router.get('/check-status', verifyToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const isPremium = await database.isPremium(userId);
-    res.json({ isPremium });
-  } catch (error) {
-    console.error('Error verificando estado:', error);
-    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+router.get('/check-status',
+  authService.authenticateToken.bind(authService),
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const isPremium = await database.isPremium(userId);
+      res.json({ isPremium });
+    } catch (error) {
+      console.error('Error verificando estado:', error);
+      res.status(500).json({ message: 'Error interno del servidor' });
+    }
   }
-});
+);
 // Obtener usuarios pendientes
 router.get('/admin/pending-users',
   authService.authenticateToken.bind(authService),
