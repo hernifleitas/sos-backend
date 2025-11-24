@@ -783,7 +783,7 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-router.get('/check-status', authenticateToken, async (req, res) => {
+router.get('/check-status', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const isPremium = await database.isPremium(userId);
