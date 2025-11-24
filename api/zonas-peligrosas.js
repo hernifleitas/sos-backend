@@ -212,10 +212,11 @@ coordenadas: [
   horario: 'Lun a Vie: 8:00 - 18:00, Sáb: 9:00 - 13:00',
   telefono: '11-1234-5678',
   coordenadas: [
-    [-34.833159, -58.462339],  
-    [-34.833159, -58.462339],
-  
-  ]
+  [-34.833159, -58.462339],  // Esquina superior izquierda
+  [-34.833159, -58.461339],  // Esquina superior derecha
+  [-34.834159, -58.461339],  // Esquina inferior derecha
+  [-34.834159, -58.462339]   // Esquina inferior izquierda
+]
 },
 
   ]; 
