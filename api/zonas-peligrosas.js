@@ -5,7 +5,7 @@ router.get('/', (req, res) => {
   const zonas = [
     // Zona peligrosa
     {
-      id: 1,
+      id: "Las heras y ascasubi",
       nombre: 'Zona peligrosa',
       descripcion: 'Zona con reportes de robos frecuentes.',
       tipo: 'peligrosa',
@@ -19,7 +19,7 @@ coordenadas: [
 
     // Zona peligrosa
     {
-      id: 2,
+      id: "Peya Market",
       nombre: 'Zona peligrosa',
       descripcion: 'Zona con reportes de robos frecuentes.',
       tipo: 'peligrosa',
@@ -33,7 +33,7 @@ coordenadas: [
 
      // Zona peligrosa
     {
-      id: 3,
+      id: "Fischer",
       nombre: 'Zona peligrosa',
       descripcion: 'Zona con reportes de robos frecuentes.',
       tipo: 'peligrosa',
@@ -46,7 +46,7 @@ coordenadas: [
     },
     // Local No devuelve efectivo - Mr Tasty Montegrande
     {
-      id: 4,
+      id: "lOCAL MR TASTY",
       nombre: 'Mr Tasty',
       descripcion: 'Leandro N. Alem 108',
       tipo: 'sin-efectivo',
@@ -59,7 +59,7 @@ coordenadas: [
     },
     // Zona peligrosa
     {
-      id: 5,
+      id: "Lujan",
       nombre: 'Zona peligrosa',
       descripcion: 'Zona con reportes de robos frecuentes.',
       tipo: 'peligrosa',
@@ -73,7 +73,7 @@ coordenadas: [
 
     // Zona peligrosa
     {
-      id: 6,
+      id: "Rotonda Lavallol y aproximado",
       nombre: 'Zona peligrosa',
       descripcion: 'Zona con reportes de robos frecuentes.',
       tipo: 'peligrosa',
@@ -147,7 +147,7 @@ coordenadas: [
     },
 
     {
-      id: 7,
+      id: "Barrio ONA ",
       nombre: 'Zona peligrosa',
       descripcion: 'Zona con reportes de robos frecuentes.',
       tipo: 'peligrosa',
@@ -189,7 +189,7 @@ coordenadas: [
 
 
     {
-      id: 9,
+      id: "Pasando Fair Pantano etc",
       nombre: 'Zona peligrosa',
       descripcion: 'Zona con reportes de robos frecuentes.',
       tipo: 'peligrosa',
@@ -201,6 +201,22 @@ coordenadas: [
   [-34.801824163054725, -58.479524403086]
 ]
     },
+
+
+    {
+  id: "gomeria-1",
+  nombre: 'Gomería Las Heras',
+  descripcion: 'Servicio de parche y balanceo',
+  tipo: 'gomeria',
+  servicios: ['parche', 'balanceo', 'alineación'],
+  horario: 'Lun a Vie: 8:00 - 18:00, Sáb: 9:00 - 13:00',
+  telefono: '11-1234-5678',
+  coordenadas: [
+    [-34.833159, -58.462339],  
+    [-34.833159, -58.462339],
+  
+  ]
+},
 
   ]; 
   res.json({ success: true, zonas });

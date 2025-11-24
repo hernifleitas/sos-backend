@@ -10,13 +10,36 @@ class AuthService {
     this.jwtSecret = process.env.JWT_SECRET
     this.jwtExpiresIn = '7d'; // Token válido por 7 días
   }
-
+ 
   // Helper: verificar si es Premium (o Admin)
   async isPremium(userId) {
     try {
       return await database.isPremium(userId);
     } catch (_) {
       return false;
+    }
+  }
+
+   async checkPremiumStatus() {
+    try {
+      const token = await this.getToken();
+      if (!token) return { isPremium: false, needsRefresh: false };
+      
+      const response = await fetch(`${BACKEND_URL}/api/auth/check-status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.status === 401) {
+        // Token inválido o expirado
+        await this.logout();
+        return { isPremium: false, needsRefresh: true };
+      }
+      
+      const data = await response.json();
+      return { isPremium: data.isPremium, needsRefresh: false };
+    } catch (error) {
+      console.error('Error verificando estado premium:', error);
+      return { isPremium: false, needsRefresh: false };
     }
   }
 
@@ -760,6 +783,16 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+router.get('/check-status', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const isPremium = await database.isPremium(userId);
+    res.json({ isPremium });
+  } catch (error) {
+    console.error('Error verificando estado:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
 // Obtener usuarios pendientes
 router.get('/admin/pending-users',
   authService.authenticateToken.bind(authService),
