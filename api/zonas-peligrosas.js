@@ -205,17 +205,17 @@ coordenadas: [
 
     {
   id: "gomeria-1",
-  nombre: 'Gomería Las Heras',
+  nombre: 'Gomería Alvear y liniers',
   descripcion: 'Servicio de parche y balanceo',
   tipo: 'gomeria',
-  servicios: ['parche', 'balanceo', 'alineación'],
+  servicios: ['parche', 'Camaras', 'Cubiertas'],
   horario: 'Lun a Vie: 8:00 - 18:00, Sáb: 9:00 - 13:00',
   telefono: '11-1234-5678',
-  coordenadas: [
-  [-34.833159, -58.462339],  // Esquina superior izquierda
-  [-34.833159, -58.461339],  // Esquina superior derecha
-  [-34.834159, -58.461339],  // Esquina inferior derecha
-  [-34.834159, -58.462339]   // Esquina inferior izquierda
+coordenadas: [
+  [-34.82169603355131, -58.4535354942944],  // Noroeste
+  [-34.82169603355131, -58.4533354942944],  // Noreste
+  [-34.82149603355131, -58.4533354942944],  // Sureste
+  [-34.82149603355131, -58.4535354942944]   // Suroeste
 ]
 },
 
