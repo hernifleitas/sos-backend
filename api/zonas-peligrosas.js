@@ -230,6 +230,20 @@ coordenadas: [
 ]
     },
 
+     {
+      id: "Primera Junta ",
+      nombre: 'Zona peligrosa',
+      descripcion: 'Zona con reportes de robos frecuentes.',
+      tipo: 'peligrosa',
+coordenadas: [
+  [-34.81987503730597, -58.477871683148905],
+  [-34.82187738649495, -58.48152690065332],
+  [-34.81116325431051, -58.4899987825446],
+  [-34.8085827260109, -58.48495304052419],
+  [-34.818834026931064, -58.47704870597076]
+]
+    },
+
 
     {
   id: "gomeria-1",
@@ -293,6 +307,44 @@ coordenadas: [
   telefono: "No disponible",
   coordenadas: [
     [-34.79493943128809, -58.450527442354506]
+  ]
+},
+
+{
+  id: "gomeria-6",
+  nombre: "Gomería Lucho",
+  descripcion: "Servicio de parche y balanceo",
+  tipo: "gomeria",
+  servicios: ["parche", "cámaras", "cubiertas"],
+  horario: "Lun a Vie: 6:00 - 00:00, Sáb: 6:00 - 00:30, Dom: 6:00 - 00:00",
+  telefono: "11 3261-0881",
+  coordenadas: [
+    [-34.81592776541516, -58.48748064479853]
+  ]
+},
+
+{
+  id: "gomeria-7",
+  nombre: "Gomería Cristobal Colon",
+  descripcion: "Horario declarado de 8:00 a 21:00",
+  tipo: "gomeria",
+  servicios: ["parche", "cámaras", "cubiertas"],
+  horario: "Lun a Dom: 8:00 - 21:00",
+  telefono: "No disponible",
+  coordenadas: [
+    [-34.83050761002335, -58.46746842271803]
+  ]
+},
+{
+  id: "gomeria-8",
+  nombre: "Gomería El Gringo",
+  descripcion: "Servicio de parche y reparacion de neumaticos",
+  tipo: "gomeria",
+  servicios: ["parche", "cámaras", "cubiertas"],
+  horario: "No disponible",
+  telefono: "11 2755-0460",
+  coordenadas: [
+    [-34.831393077869215, -58.47629753129641]
   ]
 }
 
