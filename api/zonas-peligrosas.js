@@ -163,8 +163,23 @@ coordenadas: [
 ]
     },
 
+      {
+      id: "Lacarmon ",
+      nombre: 'Zona peligrosa',
+      descripcion: 'Zona con reportes de robos frecuentes.',
+      tipo: 'peligrosa',
+coordenadas: [
+  [-34.79981590835102, -58.445592873111096],
+  [-34.79973247307877, -58.445454041483146],
+  [-34.798535917051446, -58.44638303958607],
+  [-34.798635306035706, -58.446573030683936],
+  [-34.799798790243635, -58.4455901394217]
+]
+
+    },
+
     {
-      id: 8,
+      id: "Local no devuelve efectivo",
       nombre: 'Helados kupanaka',
       descripcion: 'General paz 199',
       tipo: 'sin-efectivo',
@@ -175,7 +190,7 @@ coordenadas: [
   [-34.81898, -58.47378] 
 ]
     },  {
-      id: 9,
+      id: "local no devuelve efe",
       nombre: 'Lomiteria popular',
       descripcion: 'Emilio cardeza 162',
       tipo: 'sin-efectivo',
@@ -187,6 +202,19 @@ coordenadas: [
 ]
     },
 
+
+     {
+      id: "Mc. Cream eduardo arana",
+      nombre: 'Mc. Cream',
+      descripcion: 'Eduardo arana 141',
+      tipo: 'sin-efectivo',
+coordenadas: [
+  [-34.814548297041, -58.467291800617684],  // lat abajo, lng izquierda
+  [-34.814548297041, -58.467091800617684],  // lat abajo, lng derecha
+  [-34.814348297041, -58.467091800617684],  // lat arriba, lng derecha
+  [-34.814348297041, -58.467291800617684]   // lat arriba, lng izquierda
+]
+    },
 
     {
       id: "Pasando Fair Pantano etc",
@@ -210,7 +238,7 @@ coordenadas: [
   tipo: 'gomeria',
   servicios: ['parche', 'Camaras', 'Cubiertas'],
   horario: 'Lun a Vie: 8:00 - 18:00, Sáb: 9:00 - 13:00',
-  telefono: '11-1234-5678',
+  telefono: 'No disponible',
 coordenadas: [
   [-34.82169603355131, -58.4535354942944],  // Noroeste
   [-34.82169603355131, -58.4533354942944],  // Noreste
@@ -218,6 +246,55 @@ coordenadas: [
   [-34.82149603355131, -58.4535354942944]   // Suroeste
 ]
 },
+
+{
+  id: "gomeria-2",
+  nombre: "Gomería Valen",
+  descripcion: "Servicio de parche y balanceo",
+  tipo: "gomeria",
+  servicios: ["parche", "cámaras", "cubiertas"],
+  horario: "Lun a Sáb: 8:00AM - 12:00 AM",
+  telefono: "No disponible",
+  coordenadas: [
+    [-34.80067877683329, -58.47351086506636]
+  ]
+},
+{
+  id: "gomeria-3",
+  nombre: "Gomería Los Chicos",
+  descripcion: "Servicio de parche y balanceo",
+  tipo: "gomeria",
+  servicios: ["parche", "cámaras", "cubiertas"],
+  horario: "Lun a Vie: 8:00 - 20:00, Sáb: 8:00 - 22:30",
+  telefono: "No disponible",
+  coordenadas: [
+    [-34.83308227640637, -58.46235376014214]
+  ]
+},
+{
+  id: "gomeria-4",
+  nombre: "Gomería Alem",
+  descripcion: "Servicio de parche y balanceo",
+  tipo: "gomeria",
+  servicios: ["parche", "cámaras", "cubiertas"],
+  horario: "Lun a Vie: 9:00 - 23:30, Sáb y Dom: 8:25 - 23:30",
+  telefono: "No disponible",
+  coordenadas: [
+    [-34.828882088778975, -58.458284139611216]
+  ]
+},
+{
+  id: "gomeria-5",
+  nombre: "Gomería jesus",
+  descripcion: "Servicio de parche y balanceo",
+  tipo: "gomeria",
+  servicios: ["parche", "cámaras", "cubiertas"],
+  horario: "Lun a Vie: 8:00 - 22:00, Sáb: 8:00 - 22:30",
+  telefono: "No disponible",
+  coordenadas: [
+    [-34.79493943128809, -58.450527442354506]
+  ]
+}
 
   ]; 
   res.json({ success: true, zonas });
