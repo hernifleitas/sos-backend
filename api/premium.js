@@ -118,7 +118,7 @@ router.post('/activate/:paymentId', authenticateToken, async (req, res) => {
 router.post('/create-subscription', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const amount = 5000;
+    const amount = 3500;
     const currency = 'ARS';
 
     // 1️⃣ Crear preferencia de pago en MercadoPago
@@ -321,7 +321,7 @@ router.post('/activate-manual', authenticateToken, async (req, res) => {
         userId,
         'MANUAL-' + Date.now(),
         'MANUAL-PAY-' + Date.now(),
-        5000,
+        3500,
         'ARS',
         'approved'
       ]);

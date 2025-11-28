@@ -148,7 +148,10 @@ async function sendChatNotification(recipientId, message, senderName) {
       message: message.text || '(Mensaje sin texto)',
       timestamp: message.createdAt || new Date().toISOString(),
       unreadCount,
-      type: 'chat_message'
+      type: 'chat_message',
+       _notificationId: notificationId,
+      _count: unreadCount,              // Asegurar que el contador se envíe
+      _group: 'chat-messages'
     });
 
   } catch (error) {
