@@ -32,11 +32,11 @@ async function sendPush(tokens, title, body, data = {}) {
     const messages = validTokens.map(token => {
       const message = {
         to: token,
-        sound: 'default',
+        sound: null,
         title,
         body,
         data,
-        priority: 'high',
+        priority: 'default',
         _displayInForeground: true
       };
 
@@ -49,8 +49,7 @@ async function sendPush(tokens, title, body, data = {}) {
           _groupSummary: true,
           _notificationId: `chat-${data.recipientId || 'group'}`,
           _count: data.unreadCount || 1,
-          _sound: 'default',
-          priority: 'high'
+          priority: 'default'
         };
       }
 
