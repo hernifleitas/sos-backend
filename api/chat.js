@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {authService} = require('./auth');
 const database = require('../database');
+const notifications = require('../notifications');
 
 // GET /chat/history?room=global&limit=50&before=ISO_DATE
 router.get('/history', authService.authenticateToken.bind(authService), async (req, res) => {
@@ -22,14 +23,14 @@ router.get('/history', authService.authenticateToken.bind(authService), async (r
 router.post('/message', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
     const { content, room = 'global' } = req.body;
-    const userId = req.user.id; // El usuario autenticado
+    const userId = req.user.id;
 
     // Validar el contenido del mensaje
     if (!content || !content.trim()) {
       return res.status(400).json({ success: false, message: 'El mensaje no puede estar vacío' });
     }
 
-    // Verificar si el usuario tiene permisos (Premium o Admin)
+    // Verificar permisos (Premium o Admin)
     const isPremium = await database.isPremium(userId);
     const isAdmin = await database.isAdmin(userId);
     if (!isPremium && !isAdmin) {
@@ -67,13 +68,23 @@ router.post('/message', authService.authenticateToken.bind(authService), async (
 
     // Enviar notificaciones push a los demás usuarios
     try {
-      const notifications = require('../notifications');
-      const body = `${message.nombre}: ${content.slice(0, 60)}${content.length > 60 ? '…' : ''}`;
-      await notifications.sendToAllExcept(userId, '💬 Nuevo mensaje', body, {
-        kind: 'chat',
-        room,
-        messageId: message.id,
-      });
+      // Obtener todos los usuarios excepto el remitente
+      const allUsers = await database.getAllUsers();
+      const recipients = allUsers.filter(u => u.id !== userId);
+      
+      // Enviar notificación a cada destinatario
+      for (const recipient of recipients) {
+        await notifications.sendChatNotification(
+          recipient.id,  // ID del destinatario
+          {
+            chatId: room,
+            senderId: userId,
+            text: content,
+            createdAt: created_at
+          },
+          userInfo.nombre || 'Usuario'  // Nombre del remitente
+        );
+      }
     } catch (notifError) {
       console.error('Error enviando notificaciones push:', notifError);
       // No fallar la operación principal si fallan las notificaciones

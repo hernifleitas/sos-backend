@@ -741,6 +741,15 @@ WHERE is_active = true;
     })();
   }
 
+  // En sos-backend/database.js
+deleteDeviceToken(userId, token) {
+  return (async () => {
+    const sql = 'DELETE FROM device_tokens WHERE user_id = $1 AND token = $2';
+    const { rowCount } = await this.pool.query(sql, [userId, token]);
+    return { deleted: rowCount > 0 };
+  })();
+}
+
   // =================== CIERRE ===================
   close() {
     if (this.pool) {

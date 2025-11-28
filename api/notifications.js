@@ -19,6 +19,23 @@ router.post('/register', authService.authenticateToken.bind(authService), async 
   }
 });
 
+// En sos-backend/api/notifications.js
+router.post('/unregister', authService.authenticateToken.bind(authService), async (req, res) => {
+  try {
+    const { token } = req.body || {};
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ success: false, message: 'Token inválido' });
+    }
+    
+    // Eliminar el token de la base de datos
+    await database.deleteDeviceToken(req.user.id, token);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Error eliminando token de notificación:', err);
+    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
+
 // POST /notifications/test { title?, body?, data? }
 router.post('/test', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
