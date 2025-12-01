@@ -783,29 +783,52 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-router.get('/check-status',
+// En tu archivo de rutas del backend (auth.js o similar)
+router.get('/check-status', 
   authService.authenticateToken.bind(authService),
   async (req, res) => {
     try {
       const userId = req.user.id;
-      const premiumStatus = await database.isPremium(userId);
       
-      // Obtener información adicional del usuario
+      // 1. Obtener usuario de la base de datos
       const user = await database.findUserById(userId);
-      
+      if (!user) {
+        return res.status(404).json({ 
+          success: false,
+          message: 'Usuario no encontrado' 
+        });
+      }
+
+      // 2. Verificar estado premium
+      const isPremium = user.is_premium === true && 
+                       (!user.premium_expires_at || 
+                        new Date(user.premium_expires_at) > new Date());
+
+      // 3. Si el premium expiró, actualizar en la base de datos
+      if (user.is_premium && user.premium_expires_at && new Date(user.premium_expires_at) <= new Date()) {
+        await database.updateUser(userId, { 
+          is_premium: false,
+          role: 'user'  // Cambiar rol a usuario normal
+        });
+        user.is_premium = false;
+        user.role = 'user';
+      }
+
+      // 4. Enviar respuesta consistente
       res.json({ 
-        isPremium: premiumStatus,
+        isPremium,
         user: {
           id: user.id,
           nombre: user.nombre,
           email: user.email,
-          role: user.role,
-          is_premium: user.is_premium,
+          role: isPremium ? 'premium' : 'user',
+          is_premium: isPremium,
           premium_expires_at: user.premium_expires_at
         }
       });
+
     } catch (error) {
-      console.error('Error verificando estado premium:', error);
+      console.error('Error en /check-status:', error);
       res.status(500).json({ 
         success: false,
         message: 'Error interno del servidor' 
