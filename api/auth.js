@@ -788,11 +788,28 @@ router.get('/check-status',
   async (req, res) => {
     try {
       const userId = req.user.id;
-      const isPremium = await database.isPremium(userId);
-      res.json({ isPremium });
+      const premiumStatus = await database.isPremium(userId);
+      
+      // Obtener información adicional del usuario
+      const user = await database.findUserById(userId);
+      
+      res.json({ 
+        isPremium: premiumStatus,
+        user: {
+          id: user.id,
+          nombre: user.nombre,
+          email: user.email,
+          role: user.role,
+          is_premium: user.is_premium,
+          premium_expires_at: user.premium_expires_at
+        }
+      });
     } catch (error) {
-      console.error('Error verificando estado:', error);
-      res.status(500).json({ message: 'Error interno del servidor' });
+      console.error('Error verificando estado premium:', error);
+      res.status(500).json({ 
+        success: false,
+        message: 'Error interno del servidor' 
+      });
     }
   }
 );
