@@ -783,56 +783,16 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-// En tu archivo de rutas del backend (auth.js o similar)
-router.get('/check-status', 
+router.get('/check-status',
   authService.authenticateToken.bind(authService),
   async (req, res) => {
     try {
       const userId = req.user.id;
-      
-      // 1. Obtener usuario de la base de datos
-      const user = await database.findUserById(userId);
-      if (!user) {
-        return res.status(404).json({ 
-          success: false,
-          message: 'Usuario no encontrado' 
-        });
-      }
-
-      // 2. Verificar estado premium
-      const isPremium = user.is_premium === true && 
-                       (!user.premium_expires_at || 
-                        new Date(user.premium_expires_at) > new Date());
-
-      // 3. Si el premium expiró, actualizar en la base de datos
-      if (user.is_premium && user.premium_expires_at && new Date(user.premium_expires_at) <= new Date()) {
-        await database.updateUser(userId, { 
-          is_premium: false,
-          role: 'user'  // Cambiar rol a usuario normal
-        });
-        user.is_premium = false;
-        user.role = 'user';
-      }
-
-      // 4. Enviar respuesta consistente
-      res.json({ 
-        isPremium,
-        user: {
-          id: user.id,
-          nombre: user.nombre,
-          email: user.email,
-          role: isPremium ? 'premium' : 'user',
-          is_premium: isPremium,
-          premium_expires_at: user.premium_expires_at
-        }
-      });
-
+      const isPremium = await database.isPremium(userId);
+      res.json({ isPremium });
     } catch (error) {
-      console.error('Error en /check-status:', error);
-      res.status(500).json({ 
-        success: false,
-        message: 'Error interno del servidor' 
-      });
+      console.error('Error verificando estado:', error);
+      res.status(500).json({ message: 'Error interno del servidor' });
     }
   }
 );
