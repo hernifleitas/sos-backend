@@ -796,6 +796,51 @@ router.get('/check-status',
     }
   }
 );
+
+router.post('/refresh', async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'Token requerido' });
+    }
+
+    // Verificar token existente
+    const decoded = authService.verifyToken(token);
+    if (!decoded) {
+      return res.status(401).json({ success: false, message: 'Token inválido' });
+    }
+
+    // Obtener datos actualizados del usuario
+    const user = await database.findUserById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    }
+
+    // Generar nuevo token
+    const newToken = authService.generateToken(user);
+
+    res.json({
+      success: true,
+      token: newToken,
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        moto: user.moto,
+        color: user.color,
+        role: user.role,
+        telefono: user.telefono,
+        created_at: user.created_at,
+        premium_expires_at: user.premium_expires_at
+      }
+    });
+  } catch (error) {
+    console.error('Error en /refresh:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+});
+
 // Obtener usuarios pendientes
 router.get('/admin/pending-users',
   authService.authenticateToken.bind(authService),
