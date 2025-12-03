@@ -57,6 +57,16 @@ coordenadas: [
         [-34.81520, -58.46895]
       ]
     },
+
+     {
+      id: "local no devuelve efe",
+      nombre: 'Valence',
+      descripcion: 'Av. Dardo Rocha 220',
+      tipo: 'sin-efectivo',
+coordenadas: [
+  [-34.80055426866908, -58.47198486048862]
+]
+    },
     // Zona peligrosa
     {
       id: "Lujan",
@@ -203,6 +213,17 @@ coordenadas: [
     },
 
 
+    {
+      id: "Panaderia artesanal guillon",
+      nombre: 'Victorina Pastelería Artesanal',
+      descripcion: 'Mendoza 199',
+      tipo: 'sin-efectivo',
+coordenadas: [
+  [-58.447695369348494, -34.804503590448235]
+
+]
+    },
+
      {
       id: "Mc. Cream eduardo arana",
       nombre: 'Mc. Cream',
@@ -241,6 +262,21 @@ coordenadas: [
   [-34.81116325431051, -58.4899987825446],
   [-34.8085827260109, -58.48495304052419],
   [-34.818834026931064, -58.47704870597076]
+]
+    },
+
+
+     {
+      id: "Lavalle, carmen de areco",
+      nombre: 'Zona peligrosa',
+      descripcion: 'Zona con reportes de robos frecuentes.',
+      tipo: 'peligrosa',
+coordenadas: [
+  [-34.83062890457616, -58.475902107096076],
+  [-34.85104261242086, -58.460847978711016],
+  [-34.84580051023779, -58.45041073345848],
+  [-34.82548287058202, -58.466499469486166],
+  [-34.83054517255657, -58.475965715400676]
 ]
     },
 
