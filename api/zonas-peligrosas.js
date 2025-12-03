@@ -218,7 +218,7 @@ coordenadas: [
       descripcion: 'Mendoza 199',
       tipo: 'sin-efectivo',
 coordenadas: [
-  [-34.81673676653923, -58.47189424850466]
+  [-34.80453275040183, -58.44764225285436]
 
 ]
     },
