@@ -64,7 +64,7 @@ coordenadas: [
       descripcion: 'Av. Dardo Rocha 220',
       tipo: 'sin-efectivo',
 coordenadas: [
-  [-34.80055426866908, -58.47198486048862]
+  [-34.816772, -58.471819]
 ]
     },
     // Zona peligrosa
@@ -212,14 +212,13 @@ coordenadas: [
 ]
     },
 
-
     {
       id: "Panaderia artesanal guillon",
       nombre: 'Victorina Pastelería Artesanal',
       descripcion: 'Mendoza 199',
       tipo: 'sin-efectivo',
 coordenadas: [
-  [-58.447695369348494, -34.804503590448235]
+  [-34.81673676653923, -58.47189424850466]
 
 ]
     },
