@@ -57,8 +57,6 @@ async function sendPush(tokens, title, body, data = {}) {
       return message;
       
     });
-console.log("Payload enviado a Expo:", JSON.stringify(messages).length, "chars");
-messages.forEach((m, i) => console.log(i, JSON.stringify(m).length, JSON.stringify(m)));
     const response = await fetchFn(EXPO_PUSH_URL, {
       method: 'POST',
       headers: {
