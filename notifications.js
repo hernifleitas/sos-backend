@@ -145,11 +145,11 @@ async function sendChatNotification(recipientId, message, senderName) {
     return await sendPush(tokens, title, body, {
       chatId: message.chatId || 'general',
       senderId: message.senderId,
-      message: message.text || '(Mensaje sin texto)',
-      timestamp: message.createdAt || new Date().toISOString(),
+      message: (message.text || '(Mensaje sin texto)').substring(0, 80),
+timestamp: Math.floor(Date.now() / 1000).toString(),
       unreadCount,
       type: 'chat_message',
-       _notificationId: notificationId,
+       _notificationId: `chat-${recipientId}`,
       _count: unreadCount,              // Asegurar que el contador se envíe
       _group: 'chat-messages'
     });
