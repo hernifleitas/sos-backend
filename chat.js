@@ -66,17 +66,26 @@ module.exports = function initChat(io) {
         // Emitir a todos en el room
         nsp.to(targetRoom).emit('message:new', message);
 
-        // Enviar push a los demás (Premium en el futuro; por ahora a todos registrados menos el emisor)
-       // try {
-         // const body = `${message.nombre}: ${content.slice(0, 60)}${content.length > 60 ? '…' : ''}`;
-          //await notifications.sendToAllExcept(socket.user.id, '💬 Nuevo mensaje', body, {
-            //kind: 'chat',
-            //room: targetRoom,
-            //messageId: message.id,
-          //});
-        //} catch (e) {
-         // console.error('Error enviando push de chat:', e);
-        //}
+     try {
+  // Obtener todos los usuarios excepto el emisor
+  const allUsers = await database.getAllUsers();
+  const recipients = allUsers.filter(u => u.id !== socket.user.id);
+
+  for (const recipient of recipients) {
+    await notifications.sendChatNotification(
+      recipient.id,
+      {
+        chatId: targetRoom,
+        senderId: socket.user.id,
+        text: content,
+        createdAt: created_at,
+      },
+      message.nombre || 'Usuario'
+    );
+  }
+} catch (e) {
+  console.error('Error enviando push de chat (socket):', e);
+}
 
         if (ack) ack({ success: true, message });
       } catch (err) {
