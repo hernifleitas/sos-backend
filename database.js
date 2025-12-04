@@ -734,6 +734,16 @@ WHERE is_active = true;
     })();
   }
 
+  getUserDeviceTokens(userId) {
+    return (async () => {
+      const { rows } = await this.pool.query(
+        'SELECT token FROM device_tokens WHERE user_id = $1',
+        [userId]
+      );
+      return rows.map(r => r.token);
+    })();
+  }
+
   getAllTokens() {
     return (async () => {
       const { rows } = await this.pool.query('SELECT token FROM device_tokens');
