@@ -12,7 +12,7 @@ const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
 async function sendPush(tokens, title, body, data = {}) {
   if (!tokens?.length) {
-    console.log('No hay tokens para envsiar notificación');
+    console.log('No hay tokens para enviar notificación');
     return { success: true, sent: 0 };
   }
 
@@ -84,7 +84,7 @@ async function sendPush(tokens, title, body, data = {}) {
 
     return { success: true, sent: validTokens.length };
   } catch (error) {
-    console.error('Error enviando notificación:', error);
+   // console.error('Error enviando notificación:', error);
     return { 
       success: false, 
       sent: 0, 
@@ -156,7 +156,7 @@ async function sendChatNotification(recipientId, message, senderName) {
 });
 
   } catch (error) {
-    console.error('Error en sendChatNotification:', error);
+   // console.error('Error en sendChatNotification:', error);
     return { 
       success: false, 
       error: error.message,
@@ -166,16 +166,8 @@ async function sendChatNotification(recipientId, message, senderName) {
 }
 
 async function getUnreadMessageCount(recipientId) {
-  try {
-    const { rows } = await database.pool.query(
-      'SELECT COUNT(*) FROM messages WHERE recipient_id = $1 AND read = false',
-      [recipientId]
-    );
-    return parseInt(rows[0].count, 10) || 0;
-  } catch (error) {
-    console.error('Error contando mensajes no leídos:', error);
-    return 0;
-  }
+  // Por ahora no usamos mensajes no leídos reales.
+  return 0;
 }
 
 module.exports = {
