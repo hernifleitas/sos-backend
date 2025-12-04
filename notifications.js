@@ -41,21 +41,24 @@ async function sendPush(tokens, title, body, data = {}) {
       };
 
       // Si es una notificación de chat, agregar agrupación
-      if (data.chatId) {
-        message.data = {
-          ...message.data,
-          _displayInForeground: true,
-          _group: 'chat-messages',
-          _groupSummary: true,
-          _notificationId: `chat-${data.recipientId || 'group'}`,
-          _count: data.unreadCount || 1,
-          priority: 'default'
-        };
-      }
+     if (data.chatId) {
+  message.data = {
+    ...message.data,
+    _displayInForeground: true,
+    _group: 'chat-messages',
+    _groupSummary: true,
+    _notificationId: (`chat-${data.recipientId || 'group'}`).substring(0, 50),
+    _count: Math.min(data.unreadCount || 1, 99),
+    priority: 'default'
+  };
+}
+
 
       return message;
+      
     });
-
+console.log("Payload enviado a Expo:", JSON.stringify(messages).length, "chars");
+messages.forEach((m, i) => console.log(i, JSON.stringify(m).length, JSON.stringify(m)));
     const response = await fetchFn(EXPO_PUSH_URL, {
       method: 'POST',
       headers: {
