@@ -67,16 +67,16 @@ module.exports = function initChat(io) {
         nsp.to(targetRoom).emit('message:new', message);
 
         // Enviar push a los demás (Premium en el futuro; por ahora a todos registrados menos el emisor)
-        try {
-          const body = `${message.nombre}: ${content.slice(0, 60)}${content.length > 60 ? '…' : ''}`;
-          await notifications.sendToAllExcept(socket.user.id, '💬 Nuevo mensaje', body, {
-            kind: 'chat',
-            room: targetRoom,
-            messageId: message.id,
-          });
-        } catch (e) {
-          console.error('Error enviando push de chat:', e);
-        }
+       // try {
+         // const body = `${message.nombre}: ${content.slice(0, 60)}${content.length > 60 ? '…' : ''}`;
+          //await notifications.sendToAllExcept(socket.user.id, '💬 Nuevo mensaje', body, {
+            //kind: 'chat',
+            //room: targetRoom,
+            //messageId: message.id,
+          //});
+        //} catch (e) {
+         // console.error('Error enviando push de chat:', e);
+        //}
 
         if (ack) ack({ success: true, message });
       } catch (err) {
