@@ -12,7 +12,7 @@ const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
 async function sendPush(tokens, title, body, data = {}) {
   if (!tokens?.length) {
-    console.log('No hay tokens para enviar notificación');
+    console.log('No hay tokens para envsiar notificación');
     return { success: true, sent: 0 };
   }
 
@@ -143,16 +143,16 @@ async function sendChatNotification(recipientId, message, senderName) {
 
     // Enviar notificación
     return await sendPush(tokens, title, body, {
-      chatId: message.chatId || 'general',
-      senderId: message.senderId,
-      message: (message.text || '(Mensaje sin texto)').substring(0, 80),
-timestamp: Math.floor(Date.now() / 1000).toString(),
-      unreadCount,
-      type: 'chat_message',
-       _notificationId: `chat-${recipientId}`,
-      _count: unreadCount,              // Asegurar que el contador se envíe
-      _group: 'chat-messages'
-    });
+  chatId: (message.chatId || 'gen').substring(0, 20),
+  senderId: message.senderId ? message.senderId.toString().substring(0, 20) : '',
+  message: (message.text || '(Msg)').substring(0, 50),
+  timestamp: Math.floor(Date.now() / 1000).toString(),
+  unreadCount: Math.min(unreadCount, 99),
+  type: 'chat',
+  _notificationId: `c-${recipientId}`.substring(0, 30),
+  _count: Math.min(unreadCount, 99),
+  _group: 'chat'
+});
 
   } catch (error) {
     console.error('Error en sendChatNotification:', error);
