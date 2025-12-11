@@ -354,6 +354,63 @@ WHERE is_active = true;
       client.release();
     }
   }
+
+  // Verificar si un usuario es staff
+async isStaff(userId) {
+  const client = await this.pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT role FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return false;
+    }
+
+    const userRole = result.rows[0].role;
+    return userRole === 'staff';
+  } catch (error) {
+    console.error('Error en isStaff:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// Verificar si es staff o admin (para verificar usuarios)
+async isStaffOrAdmin(userId) {
+  const client = await this.pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT role FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return false;
+    }
+
+    const userRole = result.rows[0].role;
+    return userRole === 'staff' || userRole === 'admin';
+  } catch (error) {
+    console.error('Error en isStaffOrAdmin:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+makeStaff(id) {
+  return (async () => {
+    const result = await this.pool.query(
+      'UPDATE users SET role = $1 WHERE id = $2',
+      ['staff', id]
+    );
+    return { changes: result.rowCount };
+  })();
+}
+
   // Verificar si un usuario es administrador
   async isAdmin(userId) {
     const client = await this.pool.connect();
@@ -380,13 +437,13 @@ WHERE is_active = true;
   async isPremium(userId) {
     const client = await this.pool.connect();
     try {
-      // 1. Verificar si el usuario es admin (siempre premium)
-      const adminCheck = await client.query(
-        'SELECT role FROM users WHERE id = $1 AND role = $2 AND is_active = TRUE',
-        [userId, 'admin']
-      );
+    // 1. Verificar si el usuario es admin o staff (siempre premium)
+const adminOrStaffCheck = await client.query(
+  'SELECT role FROM users WHERE id = $1 AND role IN ($2, $3) AND is_active = TRUE',
+  [userId, 'admin', 'staff']
+);
 
-      if (adminCheck.rows.length > 0) return true;
+if (adminOrStaffCheck.rows.length > 0) return true;
 
       // 2. Verificar usuario premium con expiración
       const { rows } = await client.query(

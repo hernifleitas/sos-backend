@@ -294,6 +294,48 @@ class AuthService {
     }
   }
 
+
+  // Middleware para verificar si es staff
+async requireStaff(req, res, next) {
+  try {
+    const isStaff = await database.isStaff(req.user.id);
+    if (!isStaff) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. Solo Staff puede acceder a esta función'
+      });
+    }
+    next();
+  } catch (error) {
+    console.error('Error verificando permisos de staff:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
+// Middleware para verificar si es staff o admin
+async requireStaffOrAdmin(req, res, next) {
+  try {
+    const hasAccess = await database.isStaffOrAdmin(req.user.id);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. Solo Staff o Administradores pueden acceder'
+      });
+    }
+    next();
+  } catch (error) {
+    console.error('Error verificando permisos de staff/admin:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+  
+
   // Actualizar perfil de usuario
   async updateProfile(userId, updateData) {
     try {
@@ -901,7 +943,7 @@ router.post('/admin/reject-user/:userId', authService.authenticateToken.bind(aut
 // Obtener todos los usuarios (admin)
 router.get('/admin/all-users',
   authService.authenticateToken.bind(authService),
-  authService.requireAdmin.bind(authService),
+  authService.requireStaff.bind(authService),
   async (req, res) => {
     try {
       const result = await database.pool.query(
@@ -928,7 +970,7 @@ router.get('/admin/all-users',
 // Hacer premium a un usuario (admin)
 router.post('/admin/make-premium/:userId',
   authService.authenticateToken.bind(authService),
-  authService.requireAdmin.bind(authService),
+  authService.requireStaff.bind(authService),
   async (req, res) => {
     try {
       const { userId } = req.params;
