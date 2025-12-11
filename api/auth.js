@@ -886,7 +886,7 @@ router.post('/refresh', async (req, res) => {
 // Obtener usuarios pendientes
 router.get('/admin/pending-users',
   authService.authenticateToken.bind(authService),
-  authService.requireAdmin.bind(authService),
+  authService.requireStaffOrAdmin.bind(authService),
   async (req, res) => {
     try {
       const result = await authService.getPendingUsers();
