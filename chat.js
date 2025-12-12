@@ -42,7 +42,8 @@ module.exports = function initChat(io) {
         // Check de Premium/Admin antes de permitir enviar
         const hasPremium = await database.isPremium(socket.user.id);
         const isAdmin = await database.isAdmin(socket.user.id);
-        if (!hasPremium && !isAdmin) {
+        const isStaff = await database.isStaff(socket.user.id)
+        if (!hasPremium && !isAdmin && !isStaff) {
           if (ack) ack({ success: false, message: 'Función Premium requerida' });
           return;
         }
@@ -102,7 +103,7 @@ module.exports = function initChat(io) {
           if (ack) ack({ success: false, message: 'ID inválido' });
           return;
         }
-        const isAdmin = await database.isAdmin(socket.user.id);
+        const isAdmin = await database.isStaffOrAdmin(socket.user.id);
         if (!isAdmin) {
           if (ack) ack({ success: false, message: 'No autorizado' });
           return;

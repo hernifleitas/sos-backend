@@ -222,8 +222,6 @@ coordenadas: [
 
 ]
     },
-
-
 {
       id: "Glace ",
       nombre: 'GLACE',

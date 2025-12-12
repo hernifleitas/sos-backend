@@ -33,7 +33,8 @@ router.post('/message', authService.authenticateToken.bind(authService), async (
     // Verificar permisos (Premium o Admin)
     const isPremium = await database.isPremium(userId);
     const isAdmin = await database.isAdmin(userId);
-    if (!isPremium && !isAdmin) {
+    const isStaff = await database.isStaff(userId);
+    if (!isPremium && !isAdmin && !isStaff) {
       return res.status(403).json({ 
         success: false, 
         message: 'Se requiere suscripción Premium para enviar mensajes' 
@@ -98,7 +99,7 @@ router.post('/message', authService.authenticateToken.bind(authService), async (
 });
 
 // DELETE /chat/message/:id (solo admins)
-router.delete('/message/:id', authService.authenticateToken.bind(authService), authService.requireAdmin.bind(authService), async (req, res) => {
+router.delete('/message/:id', authService.authenticateToken.bind(authService), authService.requireStaffOrAdmin.bind(authService), async (req, res) => {
   try {
     const messageId = parseInt(req.params.id, 10);
     if (Number.isNaN(messageId)) return res.status(400).json({ success: false, message: 'ID inválido' });
