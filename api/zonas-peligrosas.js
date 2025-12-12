@@ -223,6 +223,18 @@ coordenadas: [
 ]
     },
 
+
+{
+      id: "Glace ",
+      nombre: 'GLACE',
+      descripcion: 'Hipólito Yrigoyen 92',
+      tipo: 'sin-efectivo',
+coordenadas: [
+  [-34.81542252315315, -58.46739587760027]
+
+]
+    },
+
      {
       id: "Mc. Cream eduardo arana",
       nombre: 'Mc. Cream',

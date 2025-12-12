@@ -901,7 +901,7 @@ router.get('/admin/pending-users',
   });
 
 // Aprobar usuario
-router.post('/admin/approve-user/:userId', authService.authenticateToken.bind(authService), authService.requireAdmin.bind(authService), async (req, res) => {
+router.post('/admin/approve-user/:userId', authService.authenticateToken.bind(authService), authService.requireStaffOrAdmin.bind(authService), async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await authService.approveUser(userId);
@@ -921,7 +921,7 @@ router.post('/admin/approve-user/:userId', authService.authenticateToken.bind(au
 });
 
 // Rechazar usuario
-router.post('/admin/reject-user/:userId', authService.authenticateToken.bind(authService), authService.requireAdmin.bind(authService), async (req, res) => {
+router.post('/admin/reject-user/:userId', authService.authenticateToken.bind(authService), authService.requireStaffOrAdmin.bind(authService), async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await authService.rejectUser(userId);
