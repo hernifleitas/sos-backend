@@ -25,8 +25,6 @@ async function sendPush(tokens, title, body, data = {}) {
     return { success: false, sent: 0, error: 'No valid tokens' };
   }
 
-  console.log(`Iniciando envío de notificaciones a ${validTokens.length} dispositivos...`);
-
   const messages = validTokens.map(token => {
     const message = {
       to: token,

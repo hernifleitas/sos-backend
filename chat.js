@@ -72,6 +72,10 @@ module.exports = function initChat(io) {
   const allUsers = await database.getAllUsers();
   const recipients = allUsers.filter(u => u.id !== socket.user.id);
 
+  if (recipients.length > 0) {
+    console.log(`Enviando notificación de chat a ${recipients.length} usuarios.`);
+  }
+
   for (const recipient of recipients) {
     await notifications.sendChatNotification(
       recipient.id,
