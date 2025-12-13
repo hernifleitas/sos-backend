@@ -11,12 +11,13 @@ if (typeof global.fetch === 'function') {
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
 async function sendPush(tokens, title, body, data = {}) {
+  const CHUNK_SIZE = 100; // Límite de Expo por solicitud
+
   if (!tokens?.length) {
     console.log('No hay tokens para enviar notificación');
     return { success: true, sent: 0 };
   }
 
-  // Filtrar tokens inválidos
   const validTokens = tokens.filter(token => 
     token && typeof token === 'string' && token.startsWith('ExponentPushToken')
   );
@@ -26,68 +27,81 @@ async function sendPush(tokens, title, body, data = {}) {
     return { success: false, sent: 0, error: 'No valid tokens' };
   }
 
-  console.log(`Enviando notificación a ${validTokens.length} dispositivos`);
+  const messages = validTokens.map(token => {
+    const message = {
+      to: token,
+      sound: 'default',
+      title,
+      body,
+      data,
+      priority: 'high', // Prioridad alta para alertas
+      _displayInForeground: true
+    };
+
+    if (data.chatId) {
+      message.data = {
+        ...message.data,
+        _displayInForeground: true,
+        _group: 'chat-messages',
+        _groupSummary: true,
+        _notificationId: (`chat-${data.recipientId || 'group'}`).substring(0, 50),
+        _count: Math.min(data.unreadCount || 1, 99),
+        priority: 'default'
+      };
+    }
+    return message;
+  });
+
+  const chunks = [];
+  for (let i = 0; i < messages.length; i += CHUNK_SIZE) {
+    chunks.push(messages.slice(i, i + CHUNK_SIZE));
+  }
+
+  let totalSent = 0;
+  let errors = [];
 
   try {
-    const messages = validTokens.map(token => {
-      const message = {
-        to: token,
-        sound: null,
-        title,
-        body,
-        data,
-        priority: 'default',
-        _displayInForeground: true
-      };
-
-      // Si es una notificación de chat, agregar agrupación
-     if (data.chatId) {
-  message.data = {
-    ...message.data,
-    _displayInForeground: true,
-    _group: 'chat-messages',
-    _groupSummary: true,
-    _notificationId: (`chat-${data.recipientId || 'group'}`).substring(0, 50),
-    _count: Math.min(data.unreadCount || 1, 99),
-    priority: 'default'
-  };
-}
-
-
-      return message;
-      
-    });
-    const response = await fetchFn(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-      },
-      body: JSON.stringify(messages),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error en la respuesta de Expo:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText
+    for (const chunk of chunks) {
+      console.log(`Enviando lote de notificaciones a ${chunk.length} dispositivos...`);
+      const response = await fetchFn(EXPO_PUSH_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip, deflate',
+        },
+        body: JSON.stringify(chunk),
       });
-      return { 
-        success: false, 
-        sent: 0, 
-        error: `HTTP ${response.status}: ${response.statusText}`,
-        details: errorText
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error en la respuesta de Expo en un lote:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        errors.push({ status: response.status, details: errorText });
+      } else {
+        totalSent += chunk.length;
+      }
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: false,
+        sent: totalSent,
+        error: `Ocurrieron errores en ${errors.length} de ${chunks.length} lotes.`,
+        details: errors
       };
     }
 
-    return { success: true, sent: validTokens.length };
+    return { success: true, sent: totalSent };
+
   } catch (error) {
-   // console.error('Error enviando notificación:', error);
+    console.error('Error general enviando notificaciones:', error);
     return { 
       success: false, 
-      sent: 0, 
+      sent: totalSent, 
       error: error.message,
       stack: error.stack 
     };
