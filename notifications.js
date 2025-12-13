@@ -11,10 +11,9 @@ if (typeof global.fetch === 'function') {
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
 async function sendPush(tokens, title, body, data = {}) {
-  const CHUNK_SIZE = 100; // Límite de Expo por solicitud
+  const CHUNK_SIZE = 100;
 
   if (!tokens?.length) {
-    console.log('No hay tokens para enviar notificación');
     return { success: true, sent: 0 };
   }
 
@@ -23,9 +22,10 @@ async function sendPush(tokens, title, body, data = {}) {
   );
 
   if (validTokens.length === 0) {
-    console.error('No hay tokens válidos para enviar');
     return { success: false, sent: 0, error: 'No valid tokens' };
   }
+
+  console.log(`Iniciando envío de notificaciones a ${validTokens.length} dispositivos...`);
 
   const messages = validTokens.map(token => {
     const message = {
@@ -34,20 +34,11 @@ async function sendPush(tokens, title, body, data = {}) {
       title,
       body,
       data,
-      priority: 'high', // Prioridad alta para alertas
+      priority: 'high',
       _displayInForeground: true
     };
-
     if (data.chatId) {
-      message.data = {
-        ...message.data,
-        _displayInForeground: true,
-        _group: 'chat-messages',
-        _groupSummary: true,
-        _notificationId: (`chat-${data.recipientId || 'group'}`).substring(0, 50),
-        _count: Math.min(data.unreadCount || 1, 99),
-        priority: 'default'
-      };
+      message.data = { ...message.data, _group: 'chat-messages' };
     }
     return message;
   });
@@ -62,7 +53,6 @@ async function sendPush(tokens, title, body, data = {}) {
 
   try {
     for (const chunk of chunks) {
-      console.log(`Enviando lote de notificaciones a ${chunk.length} dispositivos...`);
       const response = await fetchFn(EXPO_PUSH_URL, {
         method: 'POST',
         headers: {
@@ -75,11 +65,7 @@ async function sendPush(tokens, title, body, data = {}) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Error en la respuesta de Expo en un lote:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText
-        });
+        console.error(`Error en lote de notificaciones: ${response.status}`, { error: errorText });
         errors.push({ status: response.status, details: errorText });
       } else {
         totalSent += chunk.length;
@@ -87,24 +73,16 @@ async function sendPush(tokens, title, body, data = {}) {
     }
 
     if (errors.length > 0) {
-      return {
-        success: false,
-        sent: totalSent,
-        error: `Ocurrieron errores en ${errors.length} de ${chunks.length} lotes.`,
-        details: errors
-      };
+      console.error(`Finalizado con errores. Enviadas: ${totalSent}/${validTokens.length}. Fallaron ${errors.length} lotes.`);
+      return { success: false, sent: totalSent, error: 'Fallaron algunos lotes' };
     }
 
+    console.log(`Envío completado. ${totalSent} notificaciones procesadas.`);
     return { success: true, sent: totalSent };
 
   } catch (error) {
-    console.error('Error general enviando notificaciones:', error);
-    return { 
-      success: false, 
-      sent: totalSent, 
-      error: error.message,
-      stack: error.stack 
-    };
+    console.error('Error crítico enviando notificaciones:', error);
+    return { success: false, sent: totalSent, error: error.message };
   }
 }
 
@@ -112,8 +90,9 @@ async function sendToAllExcept(userId, title, body, data = {}) {
   try {
     const tokens = await database.getAllTokensExcept(userId);
     
-    if (!tokens?.length) {
-      return { success: false, error: 'No tokens found' };
+    if (!tokens || tokens.length === 0) {
+      console.log('Usuario no tiene tokens de notificación');
+      return { success: false, error: 'No device tokens' };
     }
 
     return await sendPush(tokens, title, body, data);
