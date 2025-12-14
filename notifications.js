@@ -10,7 +10,7 @@ if (typeof global.fetch === 'function') {
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
-async function sendPush(tokens, title, body, data = {}) {
+async function sendPush(tokens, title, body, data = {}, options = {}) {
   const CHUNK_SIZE = 100;
 
   if (!tokens?.length) {
@@ -28,7 +28,7 @@ async function sendPush(tokens, title, body, data = {}) {
   const messages = validTokens.map(token => {
     const message = {
       to: token,
-      sound: 'default',
+      sound: options.sound === null ? null : 'default',
       title,
       body,
       data,
@@ -159,20 +159,22 @@ async function sendChatNotification(recipientId, message, senderName) {
       : `Nuevo mensaje de ${senderName || 'un contacto'}`;
 
     // Enviar notificación
-    return await sendPush(tokens, title, body, {
-  chatId: (message.chatId || 'gen').substring(0, 20),
-  senderId: message.senderId ? message.senderId.toString().substring(0, 20) : '',
-  message: (message.text || '(Msg)').substring(0, 50),
-  timestamp: Math.floor(Date.now() / 1000).toString(),
-  unreadCount: Math.min(unreadCount, 99),
-  type: 'chat',
-  _notificationId: `c-${recipientId}`.substring(0, 30),
-  _count: Math.min(unreadCount, 99),
-  _group: 'chat'
-});
+    const data = {
+      chatId: (message.chatId || 'gen').substring(0, 20),
+      senderId: message.senderId ? message.senderId.toString().substring(0, 20) : '',
+      message: (message.text || '(Msg)').substring(0, 50),
+      timestamp: Math.floor(Date.now() / 1000).toString(),
+      unreadCount: Math.min(unreadCount, 99),
+      type: 'chat',
+      _notificationId: `c-${recipientId}`.substring(0, 30),
+      _count: Math.min(unreadCount, 99),
+      _group: 'chat'
+    };
+
+    return await sendPush(tokens, title, body, data, { sound: null });
 
   } catch (error) {
-   // console.error('Error en sendChatNotification:', error);
+    // console.error('Error en sendChatNotification:', error);
     return { 
       success: false, 
       error: error.message,
