@@ -809,13 +809,25 @@ if (adminOrStaffCheck.rows.length > 0) return true;
   }
 
   // En sos-backend/database.js
-deleteDeviceToken(userId, token) {
-  return (async () => {
-    const sql = 'DELETE FROM device_tokens WHERE user_id = $1 AND token = $2';
-    const { rowCount } = await this.pool.query(sql, [userId, token]);
-    return { deleted: rowCount > 0 };
-  })();
-}
+  deleteDeviceToken(userId, token) {
+    return (async () => {
+      const sql = 'DELETE FROM device_tokens WHERE user_id = $1 AND token = $2';
+      const { rowCount } = await this.pool.query(sql, [userId, token]);
+      return { deleted: rowCount > 0 };
+    })();
+  }
+
+  deleteTokens(tokens) {
+    return (async () => {
+      if (!tokens || tokens.length === 0) {
+        return { deleted: 0 };
+      }
+      const placeholders = tokens.map((_, i) => `$${i + 1}`).join(',');
+      const sql = `DELETE FROM device_tokens WHERE token IN (${placeholders})`;
+      const { rowCount } = await this.pool.query(sql, tokens);
+      return { deleted: rowCount };
+    })();
+  }
 
   // =================== CIERRE ===================
   close() {

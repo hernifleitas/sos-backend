@@ -47,36 +47,61 @@ async function sendPush(tokens, title, body, data = {}) {
   }
 
   let totalSent = 0;
-  let errors = [];
+  const ticketErrors = [];
+  const invalidTokens = new Set();
 
   try {
-    for (const chunk of chunks) {
-      const response = await fetchFn(EXPO_PUSH_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Accept-Encoding': 'gzip, deflate',
-        },
-        body: JSON.stringify(chunk),
-      });
+    const ticketPromises = chunks.map(chunk => fetchFn(EXPO_PUSH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip, deflate',
+      },
+      body: JSON.stringify(chunk),
+    }));
 
+    const responses = await Promise.all(ticketPromises);
+
+    for (const response of responses) {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Error en lote de notificaciones: ${response.status}`, { error: errorText });
-        errors.push({ status: response.status, details: errorText });
-      } else {
-        totalSent += chunk.length;
+        ticketErrors.push({ status: response.status, details: errorText });
+        continue;
       }
+
+      const { data: tickets } = await response.json();
+      
+      tickets.forEach((ticket, index) => {
+        if (ticket.status === 'ok') {
+          totalSent++;
+        } else {
+          const errorDetails = ticket.details?.error;
+          if (errorDetails === 'DeviceNotRegistered') {
+            const badToken = chunks.flat()[index].to;
+            invalidTokens.add(badToken);
+          }
+          ticketErrors.push({ 
+            status: ticket.status, 
+            message: ticket.message, 
+            details: ticket.details 
+          });
+        }
+      });
     }
 
-    if (errors.length > 0) {
-      console.error(`Finalizado con errores. Enviadas: ${totalSent}/${validTokens.length}. Fallaron ${errors.length} lotes.`);
-      return { success: false, sent: totalSent, error: 'Fallaron algunos lotes' };
+    if (invalidTokens.size > 0) {
+      console.log(`Eliminando ${invalidTokens.size} tokens inválidos...`);
+      database.deleteTokens(Array.from(invalidTokens)).catch(console.error);
     }
 
-    console.log(`Envío completado. ${totalSent} notificaciones procesadas.`);
-    return { success: true, sent: totalSent };
+    if (ticketErrors.length > 0) {
+      console.error(`Finalizado con ${ticketErrors.length} errores individuales. Notificaciones enviadas: ${totalSent}/${validTokens.length}.`);
+    }
+
+    console.log(`Envío completado. ${totalSent} notificaciones enviadas con éxito.`);
+    return { success: ticketErrors.length === 0, sent: totalSent, errors: ticketErrors };
 
   } catch (error) {
     console.error('Error crítico enviando notificaciones:', error);
