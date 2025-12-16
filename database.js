@@ -223,8 +223,10 @@ WHERE is_active = true;
 
     // Tabla de gomeros
 await client.query(`
-  -- Tabla de gomeros
-  CREATE TABLE IF NOT EXISTS gomeros (
+  -- Eliminar la tabla si existe (opcional, ten cuidado en producción)
+  DROP TABLE IF EXISTS gomeros CASCADE;
+  -- Crear tabla de gomeros
+  CREATE TABLE gomeros (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     is_available BOOLEAN NOT NULL DEFAULT true,
@@ -237,29 +239,26 @@ await client.query(`
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(user_id)
   );
-
-  -- Índices para gomeros
-  CREATE INDEX IF NOT EXISTS idx_gomeros_available ON gomeros(is_available);
-  CREATE INDEX IF NOT EXISTS idx_gomeros_location ON gomeros(current_lat, current_lng);
-  CREATE INDEX IF NOT EXISTS idx_gomeros_user ON gomeros(user_id);
+  -- Crear índices para gomeros
+  CREATE INDEX idx_gomeros_available ON gomeros(is_available);
+  CREATE INDEX idx_gomeros_location ON gomeros(current_lat, current_lng);
+  CREATE INDEX idx_gomeros_user ON gomeros(user_id);
 `);
-
-// Función para actualizar automáticamente updated_at en gomeros
+// Función para actualizar automáticamente updated_at
 await client.query(`
-  DROP TRIGGER IF EXISTS update_gomeros_updated_at ON gomeros;
-  
-  CREATE OR REPLACE FUNCTION update_gomeros_updated_at()
+  CREATE OR REPLACE FUNCTION update_updated_at_column()
   RETURNS TRIGGER AS $$
   BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
   END;
   $$ LANGUAGE plpgsql;
-
+  -- Crear trigger para gomeros
+  DROP TRIGGER IF EXISTS update_gomeros_updated_at ON gomeros;
   CREATE TRIGGER update_gomeros_updated_at
   BEFORE UPDATE ON gomeros
   FOR EACH ROW
-  EXECUTE FUNCTION update_gomeros_updated_at();
+  EXECUTE FUNCTION update_updated_at_column();
 `);
     // Crear trigger para el historial
     await client.query(`
