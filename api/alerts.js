@@ -8,10 +8,10 @@ const {
 } = require('../notifications');
 
 // Middleware para autenticación
-const { authenticateToken } = require('./auth');
+const authService = require('./authService');
 
 // Enviar alerta de pinchazo
-router.post('/pinchazo', authenticateToken, async (req, res) => {
+router.post('/pinchazo', authService.authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { location } = req.body;
@@ -50,7 +50,7 @@ router.post('/pinchazo', authenticateToken, async (req, res) => {
 });
 
 // Aceptar alerta de pinchazo (para gomeros)
-router.post('/pinchazo/:alertId/accept', authenticateToken, async (req, res) => {
+router.post('/pinchazo/:alertId/accept', authService.authenticateToken, async (req, res) => {
   try {
     const { alertId } = req.params;
     const userId = req.user.id;
@@ -87,7 +87,7 @@ router.post('/pinchazo/:alertId/accept', authenticateToken, async (req, res) => 
 });
 
 // Obtener alertas de pinchazo activas (para gomeros)
-router.get('/pinchazo/active', authenticateToken, async (req, res) => {
+router.get('/pinchazo/active', authService.authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -106,7 +106,7 @@ router.get('/pinchazo/active', authenticateToken, async (req, res) => {
 });
 
 // Obtener historial de alertas de un usuario
-router.get('/pinchazo/history', authenticateToken, async (req, res) => {
+router.get('/pinchazo/history', authService.authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const alerts = await database.getUserPinchazoAlerts(userId);
@@ -118,7 +118,7 @@ router.get('/pinchazo/history', authenticateToken, async (req, res) => {
 });
 
 // Cancelar alerta de pinchazo
-router.post('/pinchazo/:alertId/cancel', authenticateToken, async (req, res) => {
+router.post('/pinchazo/:alertId/cancel', authService.authenticateToken, async (req, res) => {
   try {
     const { alertId } = req.params;
     const userId = req.user.id;
