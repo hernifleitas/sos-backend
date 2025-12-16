@@ -183,6 +183,69 @@ async function sendChatNotification(recipientId, message, senderName) {
   }
 }
 
+async function notifyGomerosAboutPinchazo(alertId, riderName, location) {
+  try {
+    // Obtener gomeros cercanos (dentro de 10km por defecto)
+    const gomeros = await database.getGomerosCercanos(location.lat, location.lng, 10);
+    
+    if (gomeros.length === 0) {
+      console.log('No hay gomeros cercanos para notificar');
+      return { success: false, sent: 0, error: 'No hay gomeros cercanos' };
+    }
+    // Obtener tokens de los gomeros
+    const tokens = gomeros.map(g => g.expo_push_token).filter(Boolean);
+    
+    const title = '🚨 ¡Nueva alerta de pinchazo!';
+    const body = `${riderName} necesita ayuda con un pinchazo cercano.`;
+    
+    // Enviar notificación
+    return await sendPush(tokens, title, body, {
+      type: 'pinchazo_alert',
+      alertId: alertId.toString(),
+      riderName,
+      location: JSON.stringify(location)
+    }, {
+      sound: 'default',
+      priority: 'high'
+    });
+  } catch (error) {
+    console.error('Error notificando a gomeros:', error);
+    return { success: false, error: error.message };
+  }
+}
+/**
+ * Notifica al rider que un gomero ha aceptado su solicitud
+ */
+async function notifyRiderAboutGomero(alertId, gomeroName, gomeroPhone) {
+  try {
+    // Obtener el rider de la alerta
+    const alert = await database.getPinchazoAlert(alertId);
+    if (!alert) {
+      throw new Error('Alerta no encontrada');
+    }
+    // Obtener token del rider
+    const rider = await database.getUserById(alert.user_id);
+    if (!rider || !rider.expo_push_token) {
+      throw new Error('No se pudo encontrar el token del rider');
+    }
+    const title = '✅ ¡Un gomero está en camino!';
+    const body = `${gomeroName} ha aceptado tu solicitud. Teléfono: ${gomeroPhone}`;
+    
+    return await sendPush([rider.expo_push_token], title, body, {
+      type: 'gomero_accepted',
+      alertId: alertId.toString(),
+      gomeroName,
+      gomeroPhone
+    }, {
+      sound: 'default',
+      priority: 'high'
+    });
+  } catch (error) {
+    console.error('Error notificando al rider:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 async function getUnreadMessageCount(recipientId) {
   // Por ahora no usamos mensajes no leídos reales.
   return 0;
@@ -192,5 +255,7 @@ module.exports = {
   sendPush,
   sendToAllExcept,
   sendChatNotification,
-  getUnreadMessageCount
+  getUnreadMessageCount,
+  notifyGomerosAboutPinchazo,
+  notifyRiderAboutGomero
 };

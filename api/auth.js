@@ -10,6 +10,45 @@ class AuthService {
     this.jwtSecret = process.env.JWT_SECRET
     this.jwtExpiresIn = '7d'; // Token válido por 7 días
   }
+
+
+  async requireGomero(req, res, next) {
+  try {
+    const user = await database.findUserById(req.user.id);
+    if (user.role !== 'gomero') {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. Solo gomeros pueden acceder a esta función'
+      });
+    }
+    next();
+  } catch (error) {
+    console.error('Error verificando rol de gomero:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+// Middleware para verificar si es gomero o staff
+async requireGomeroOrStaff(req, res, next) {
+  try {
+    const user = await database.findUserById(req.user.id);
+    if (user.role !== 'gomero' && user.role !== 'staff') {
+      return res.status(403).json({
+        success: false,
+        message: 'Acceso denegado. Se requiere ser gomero o administrador'
+      });
+    }
+    next();
+  } catch (error) {
+    console.error('Error verificando permisos de gomero/admin:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
  
   // Helper: verificar si es Premium (o Admin)
   async isPremium(userId) {
@@ -59,7 +98,8 @@ class AuthService {
     const payload = {
       id: user.id,
       email: user.email,
-      nombre: user.nombre
+      nombre: user.nombre,
+      role: user.role || 'user'
     };
 
     return jwt.sign(payload, this.jwtSecret, {
@@ -1053,6 +1093,85 @@ router.post('/admin/make-premium/:userId',
     }
   });
 
+  // Ruta para que un admin pueda hacer gomero a un usuario
+router.post('/admin/make-gomero/:userId',
+  authService.authenticateToken.bind(authService),
+  authService.requireAdmin.bind(authService),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      // Actualizar el rol del usuario a 'gomero'
+      const result = await database.updateUserRole(userId, 'gomero');
+      
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado'
+        });
+      }
+      res.json({
+        success: true,
+        message: 'Usuario actualizado a gomero exitosamente'
+      });
+    } catch (error) {
+      console.error('Error actualizando a gomero:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+);
+// Ruta para que un staff pueda quitar el rol gomero
+router.post('/admin/remove-gomero/:userId',
+  authService.authenticateToken.bind(authService),
+  authService.requireStaff.bind(authService),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const result = await database.updateUserRole(userId, 'user');
+      
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado'
+        });
+      }
+      res.json({
+        success: true,
+        message: 'Rol gomero removido exitosamente'
+      });
+    } catch (error) {
+      console.error('Error removiendo rol gomero:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+);
+// Ruta para obtener todos los gomeros
+router.get('/gomeros',
+  authService.authenticateToken.bind(authService),
+  authService.requireStaff.bind(authService),
+  async (req, res) => {
+    try {
+      const gomeros = await database.getUsersByRole('gomero');
+      res.json({
+        success: true,
+        gomeros
+      });
+    } catch (error) {
+      console.error('Error obteniendo gomeros:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+);
+
 router.post('/activate', async (req, res) => {
   try {
     const { userId, paymentId } = req.body;
@@ -1077,5 +1196,14 @@ router.post('/activate', async (req, res) => {
     res.status(500).json({ error: 'Error interno' });
   }
 });
+
+router.get('/gomeriamovil',
+  authService.authenticateToken.bind(authService),
+  authService.requireGomero.bind(authService),
+  (req, res) => {
+    // Solo gomeros pueden acceder aquí
+    res.json({ message: 'Acceso permitido para gomeros' });
+  }
+);
 
 module.exports = { router, authService }

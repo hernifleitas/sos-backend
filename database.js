@@ -42,7 +42,6 @@ class Database {
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Asegúrate de que no haya duplicados activos
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_active_subscription 
 ON premium_subscriptions(user_id) 
 WHERE is_active = true;
@@ -124,11 +123,122 @@ WHERE is_active = true;
             EXECUTE FUNCTION set_updated_at();
           END IF;
         END $$;
-      `);
-    } finally {
-      client.release();
-    }
+      `); 
+ // GOMERIA-MOVIL.
+
+       await client.query(`
+      -- Tabla de alertas de pinchazo
+      CREATE TABLE IF NOT EXISTS pinchazo_alerts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        gomero_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending' 
+          CHECK (status IN ('pending', 'accepted', 'rejected', 'completed', 'cancelled')),
+        location_lat DECIMAL(10, 8) NOT NULL,
+        location_lng DECIMAL(11, 8) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        canceled_at TIMESTAMP WITH TIME ZONE,
+        completed_at TIMESTAMP WITH TIME ZONE,
+        notes TEXT
+      );
+      
+      -- Historial de cambios de estado
+      CREATE TABLE IF NOT EXISTS pinchazo_alert_history (
+        id SERIAL PRIMARY KEY,
+        alert_id INTEGER NOT NULL REFERENCES pinchazo_alerts(id) ON DELETE CASCADE,
+        status VARCHAR(20) NOT NULL,
+        changed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        notes TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+// Crear índices
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_pinchazo_alerts_status ON pinchazo_alerts(status);
+      CREATE INDEX IF NOT EXISTS idx_pinchazo_alerts_user ON pinchazo_alerts(user_id);
+      CREATE INDEX IF NOT EXISTS idx_pinchazo_alerts_gomero ON pinchazo_alerts(gomero_id);
+      CREATE INDEX IF NOT EXISTS idx_pinchazo_alerts_created ON pinchazo_alerts(created_at);
+    `);
+    // Verificar y agregar la columna 'role' si no existe
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'users' AND column_name = 'role') THEN
+          ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user';
+          
+          -- Actualizar roles existentes según la lógica actual
+          UPDATE users SET role = 'premium' 
+          WHERE id IN (SELECT user_id FROM premium_subscriptions WHERE is_active = true);
+          
+          -- Asegurar que los administradores tengan el rol correcto
+          -- Ajusta según tu lógica actual de administradores
+          -- UPDATE users SET role = 'admin' WHERE is_admin = true;
+          
+          -- Agregar restricción CHECK
+          ALTER TABLE users 
+          ADD CONSTRAINT users_role_check 
+          CHECK (role IN ('user', 'admin', 'premium', 'staff', 'gomero'));
+        END IF;
+      $$;
+    `);
+    // Crear función para actualizar automáticamente updated_at
+    await client.query(`
+      CREATE OR REPLACE FUNCTION update_updated_at_column()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.updated_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    // Crear trigger para pinchazo_alerts
+    await client.query(`
+      DROP TRIGGER IF EXISTS update_pinchazo_alerts_updated_at ON pinchazo_alerts;
+      CREATE TRIGGER update_pinchazo_alerts_updated_at
+      BEFORE UPDATE ON pinchazo_alerts
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column();
+    `);
+    // Función para registrar cambios en el historial
+    await client.query(`
+      CREATE OR REPLACE FUNCTION log_pinchazo_alert_change()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        INSERT INTO pinchazo_alert_history (alert_id, status, changed_by, notes)
+        VALUES (NEW.id, NEW.status, NEW.gomero_id, 
+          CASE 
+            WHEN OLD.status = 'pending' AND NEW.status = 'accepted' THEN 'El gomero ha aceptado la solicitud'
+            WHEN OLD.status = 'accepted' AND NEW.status = 'completed' THEN 'El servicio ha sido completado'
+            WHEN OLD.status = 'accepted' AND NEW.status = 'cancelled' THEN 'El servicio ha sido cancelado'
+            WHEN OLD.status = 'pending' AND NEW.status = 'rejected' THEN 'La solicitud ha sido rechazada'
+            ELSE NULL
+          END
+        );
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+    `);
+    // Crear trigger para el historial
+    await client.query(`
+      DROP TRIGGER IF EXISTS trigger_log_pinchazo_alert_change ON pinchazo_alerts;
+      CREATE TRIGGER trigger_log_pinchazo_alert_change
+      AFTER UPDATE OF status ON pinchazo_alerts
+      FOR EACH ROW
+      WHEN (OLD.status IS DISTINCT FROM NEW.status)
+      EXECUTE FUNCTION log_pinchazo_alert_change();
+    `);
+    await client.query('COMMIT');
+    console.log('Tablas de gomeros creadas con éxito');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error creando tablas de gomeros:', error);
+    throw error;
+  } finally {
+    client.release();
   }
+}
 
   // =================== MÉTODOS USUARIOS ===================
   createUser(userData) {
@@ -730,6 +840,149 @@ if (adminOrStaffCheck.rows.length > 0) return true;
       client.release();
     }
   }
+
+  // =================== gomeria-movil ===================
+// Métodos para gomeros
+getGomeros() {
+  return (async () => {
+    const result = await this.pool.query(
+      `SELECT id, nombre, email, telefono, created_at 
+       FROM users 
+       WHERE role = 'gomero' AND is_active = TRUE`
+    );
+    return result.rows;
+  })();
+}
+
+getGomerosCercanos(lat, lng, radiusKm = 10) {
+  return (async () => {
+    // Radio de la Tierra en kilómetros
+    const earthRadiusKm = 6371;
+    
+    const query = `
+      SELECT 
+        id, 
+        nombre, 
+        email, 
+        telefono,
+        last_known_lat, 
+        last_known_lng,
+        ${earthRadiusKm} * 
+          acos(
+            cos(radians($1)) * 
+            cos(radians(last_known_lat)) * 
+            cos(radians(last_known_lng) - radians($2)) + 
+            sin(radians($1)) * 
+            sin(radians(last_known_lat))
+          ) AS distance
+      FROM users
+      WHERE role = 'gomero' 
+        AND is_active = TRUE
+        AND last_known_lat IS NOT NULL
+        AND last_known_lng IS NOT NULL
+      HAVING ${earthRadiusKm} * 
+        acos(
+          cos(radians($1)) * 
+          cos(radians(last_known_lat)) * 
+          cos(radians(last_known_lng) - radians($2)) + 
+          sin(radians($1)) * 
+          sin(radians(last_known_lat))
+        ) <= $3
+      ORDER BY distance
+      LIMIT 20
+    `;
+    
+    const result = await this.pool.query(query, [lat, lng, radiusKm]);
+    return result.rows;
+  })();
+}
+
+createPinchazoAlert(alertData) {
+  return (async () => {
+    const { userId, lat, lng, notes } = alertData;
+    const result = await this.pool.query(
+      `INSERT INTO pinchazo_alerts 
+       (user_id, location_lat, location_lng, notes)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [userId, lat, lng, notes || null]
+    );
+    return result.rows[0];
+  })();
+}
+
+updatePinchazoAlertStatus(alertId, status, gomeroId = null) {
+  return (async () => {
+    const result = await this.pool.query(
+      `UPDATE pinchazo_alerts
+       SET status = $1,
+           gomero_id = CASE WHEN $2 IS NOT NULL THEN $2 ELSE gomero_id END,
+           updated_at = NOW(),
+           completed_at = CASE WHEN $1 = 'completed' THEN NOW() ELSE completed_at END,
+           canceled_at = CASE WHEN $1 = 'cancelled' THEN NOW() ELSE canceled_at END
+       WHERE id = $3
+       RETURNING *`,
+      [status, gomeroId, alertId]
+    );
+    return result.rows[0] || null;
+  })();
+}
+
+getUserPinchazoAlerts(userId) {
+  return (async () => {
+    const result = await this.pool.query(
+      `SELECT pa.*, 
+              u1.nombre as user_nombre, u1.telefono as user_telefono,
+              u2.nombre as gomero_nombre, u2.telefono as gomero_telefono
+       FROM pinchazo_alerts pa
+       JOIN users u1 ON pa.user_id = u1.id
+       LEFT JOIN users u2 ON pa.gomero_id = u2.id
+       WHERE pa.user_id = $1
+       ORDER BY pa.created_at DESC`,
+      [userId]
+    );
+    return result.rows;
+  })();
+}
+
+getGomeroPinchazoAlerts(gomeroId, status = null) {
+  return (async () => {
+    let query = `
+      SELECT pa.*, 
+             u.nombre as user_nombre, u.telefono as user_telefono
+      FROM pinchazo_alerts pa
+      JOIN users u ON pa.user_id = u.id
+      WHERE (pa.gomero_id = $1 OR (pa.gomero_id IS NULL AND pa.status = 'pending'))
+    `;
+    
+    const params = [gomeroId];
+    
+    if (status) {
+      query += ' AND pa.status = $2';
+      params.push(status);
+    }
+    
+    query += ' ORDER BY pa.created_at DESC';
+    
+    const result = await this.pool.query(query, params);
+    return result.rows;
+  })();
+}
+
+getPinchazoAlertHistory(alertId) {
+  return (async () => {
+    const result = await this.pool.query(
+      `SELECT h.*, u.nombre as changed_by_name
+       FROM pinchazo_alert_history h
+       LEFT JOIN users u ON h.changed_by = u.id
+       WHERE h.alert_id = $1
+       ORDER BY h.created_at ASC`,
+      [alertId]
+    );
+    return result.rows;
+  })();
+}
+
   // =================== CHAT ===================
   addMessage(userId, content, room = 'global') {
     return (async () => {
