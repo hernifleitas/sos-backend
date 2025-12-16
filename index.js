@@ -262,6 +262,10 @@ if (esNotificable) {
   }
 });
 
+
+const alertsRouter = require('./api/alerts');
+app.use('/api/alerts', alertsRouter);
+
 // Endpoint para obtener riders activos
 app.get("/riders", (req, res) => {
   const now = Date.now();
