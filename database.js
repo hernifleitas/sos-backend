@@ -173,6 +173,7 @@ WHERE is_active = true;
           ADD CONSTRAINT users_role_check 
           CHECK (role IN ('user', 'admin', 'premium', 'staff', 'gomero'));
         END IF;
+      END;
       $$;
     `);
     // Crear función para actualizar automáticamente updated_at
