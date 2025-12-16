@@ -220,6 +220,47 @@ WHERE is_active = true;
       END;
       $$ LANGUAGE plpgsql;
     `);
+
+    // Tabla de gomeros
+await client.query(`
+  -- Tabla de gomeros
+  CREATE TABLE IF NOT EXISTS gomeros (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    is_available BOOLEAN NOT NULL DEFAULT true,
+    current_lat DECIMAL(10, 8),
+    current_lng DECIMAL(11, 8),
+    rating DECIMAL(3, 2) DEFAULT 5.0,
+    total_services INTEGER DEFAULT 0,
+    phone VARCHAR(20),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id)
+  );
+
+  -- Índices para gomeros
+  CREATE INDEX IF NOT EXISTS idx_gomeros_available ON gomeros(is_available);
+  CREATE INDEX IF NOT EXISTS idx_gomeros_location ON gomeros(current_lat, current_lng);
+  CREATE INDEX IF NOT EXISTS idx_gomeros_user ON gomeros(user_id);
+`);
+
+// Función para actualizar automáticamente updated_at en gomeros
+await client.query(`
+  DROP TRIGGER IF EXISTS update_gomeros_updated_at ON gomeros;
+  
+  CREATE OR REPLACE FUNCTION update_gomeros_updated_at()
+  RETURNS TRIGGER AS $$
+  BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+  END;
+  $$ LANGUAGE plpgsql;
+
+  CREATE TRIGGER update_gomeros_updated_at
+  BEFORE UPDATE ON gomeros
+  FOR EACH ROW
+  EXECUTE FUNCTION update_gomeros_updated_at();
+`);
     // Crear trigger para el historial
     await client.query(`
       DROP TRIGGER IF EXISTS trigger_log_pinchazo_alert_change ON pinchazo_alerts;
