@@ -110,6 +110,37 @@ class EmailService {
     }
   }
 
+// EMAIL DE ERROR 
+  async sendChatErrorNotice(user) {
+  const notice =
+    'Estamos teniendo inconvenientes con el chat de riders. ' +
+    'Para solucionarlo, cerrá sesión y volvé a iniciar sesión.';
+
+  return this.client.sendTransacEmail({
+    sender: {
+      name: 'Rider SOS Delivery',
+      email: process.env.EMAIL_FROM
+    },
+    to: [{ email: user.email, name: user.nombre }],
+    subject: '⚠️ Aviso importante – Rider SOS',
+    htmlContent: `
+      <html>
+        <body>
+          <h2>⚠️ Aviso importante</h2>
+          <p>Hola ${user.nombre},</p>
+
+          <p>${notice}</p>
+
+          <p><strong>Solución:</strong> cerrá sesión y volvé a iniciar sesión.</p>
+
+          <small>Rider SOS – mensaje automático</small>
+        </body>
+      </html>
+    `,
+    textContent: notice
+  });
+}
+
     // Generar HTML del email de reset de contraseña
     generatePasswordResetEmailHTML(user, newPassword) {
       return `

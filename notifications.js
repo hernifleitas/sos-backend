@@ -10,6 +10,32 @@ if (typeof global.fetch === 'function') {
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
+
+let pushStats = {
+  totalSent: 0,
+  totalTargets: 0,
+  logsScheduled: false
+};
+
+function logPushSummary() {
+  if (pushStats.logsScheduled) return;
+
+  pushStats.logsScheduled = true;
+
+  setTimeout(() => {
+    console.log(
+      `[PUSH] Enviando notificación a ${pushStats.totalTargets} dispositivos ` +
+      `(entregadas: ${pushStats.totalSent})`
+    );
+
+    // Reset
+    pushStats.totalSent = 0;
+    pushStats.totalTargets = 0;
+    pushStats.logsScheduled = false;
+  }, 2000); // junta envíos durante 2 segundos
+}
+
+
 async function sendPush(tokens, title, body, data = {}, options = {}) {
   const CHUNK_SIZE = 100;
 
@@ -17,7 +43,7 @@ async function sendPush(tokens, title, body, data = {}, options = {}) {
     return { success: true, sent: 0 };
   }
 
-  const validTokens = tokens.filter(token => 
+  const validTokens = tokens.filter(token =>
     token && typeof token === 'string' && token.startsWith('ExponentPushToken')
   );
 
@@ -72,7 +98,7 @@ async function sendPush(tokens, title, body, data = {}, options = {}) {
       }
 
       const { data: tickets } = await response.json();
-      
+
       tickets.forEach((ticket, index) => {
         if (ticket.status === 'ok') {
           totalSent++;
@@ -82,10 +108,10 @@ async function sendPush(tokens, title, body, data = {}, options = {}) {
             const badToken = chunks.flat()[index].to;
             invalidTokens.add(badToken);
           }
-          ticketErrors.push({ 
-            status: ticket.status, 
-            message: ticket.message, 
-            details: ticket.details 
+          ticketErrors.push({
+            status: ticket.status,
+            message: ticket.message,
+            details: ticket.details
           });
         }
       });
@@ -99,8 +125,10 @@ async function sendPush(tokens, title, body, data = {}, options = {}) {
     if (ticketErrors.length > 0) {
       console.error(`Finalizado con ${ticketErrors.length} errores individuales. Notificaciones enviadas: ${totalSent}/${validTokens.length}.`);
     }
+    pushStats.totalSent += totalSent;
+    pushStats.totalTargets += validTokens.length;
 
-    console.log(`Envío completado. ${totalSent} notificaciones enviadas con éxito.`);
+    logPushSummary();
     return { success: ticketErrors.length === 0, sent: totalSent, errors: ticketErrors };
 
   } catch (error) {
@@ -112,7 +140,7 @@ async function sendPush(tokens, title, body, data = {}, options = {}) {
 async function sendToAllExcept(userId, title, body, data = {}) {
   try {
     const tokens = await database.getAllTokensExcept(userId);
-    
+
     if (!tokens || tokens.length === 0) {
       console.log('Usuario no tiene tokens de notificación');
       return { success: false, error: 'No device tokens' };
@@ -125,8 +153,8 @@ async function sendToAllExcept(userId, title, body, data = {}) {
       stack: error.stack,
       userId
     });
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     };
@@ -151,11 +179,11 @@ async function sendChatNotification(recipientId, message, senderName) {
 
     // Contar mensajes no leídos
     const unreadCount = await getUnreadMessageCount(recipientId);
-    
+
     // Configurar notificación agrupada
     const title = 'Chat Riders';
-    const body = unreadCount > 1 
-      ? `Tienes ${unreadCount} mensajes nuevos` 
+    const body = unreadCount > 1
+      ? `Tienes ${unreadCount} mensajes nuevos`
       : `Nuevo mensaje de ${senderName || 'un contacto'}`;
 
     // Enviar notificación
@@ -175,8 +203,8 @@ async function sendChatNotification(recipientId, message, senderName) {
 
   } catch (error) {
     // console.error('Error en sendChatNotification:', error);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     };
@@ -187,17 +215,17 @@ async function notifyGomerosAboutPinchazo(alertId, riderName, location) {
   try {
     // Obtener gomeros cercanos (dentro de 10km por defecto)
     const gomeros = await database.getGomerosCercanos(location.lat, location.lng, 10);
-    
+
     if (gomeros.length === 0) {
       console.log('No hay gomeros cercanos para notificar');
       return { success: false, sent: 0, error: 'No hay gomeros cercanos' };
     }
     // Obtener tokens de los gomeros
     const tokens = gomeros.map(g => g.expo_push_token).filter(Boolean);
-    
+
     const title = '🚨 ¡Nueva alerta de pinchazo!';
     const body = `${riderName} necesita ayuda con un pinchazo cercano.`;
-    
+
     // Enviar notificación
     return await sendPush(tokens, title, body, {
       type: 'pinchazo_alert',
@@ -213,6 +241,7 @@ async function notifyGomerosAboutPinchazo(alertId, riderName, location) {
     return { success: false, error: error.message };
   }
 }
+
 /**
  * Notifica al rider que un gomero ha aceptado su solicitud
  */
@@ -230,7 +259,7 @@ async function notifyRiderAboutGomero(alertId, gomeroName, gomeroPhone) {
     }
     const title = '✅ ¡Un gomero está en camino!';
     const body = `${gomeroName} ha aceptado tu solicitud. Teléfono: ${gomeroPhone}`;
-    
+
     return await sendPush([rider.expo_push_token], title, body, {
       type: 'gomero_accepted',
       alertId: alertId.toString(),
