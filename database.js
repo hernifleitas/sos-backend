@@ -127,7 +127,7 @@ WHERE is_active = true;
  // GOMERIA-MOVIL.
 
        await client.query(`
-      -- Tabla de alertas de pinchazo
+    
       CREATE TABLE IF NOT EXISTS pinchazo_alerts (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -143,7 +143,6 @@ WHERE is_active = true;
         notes TEXT
       );
       
-      -- Historial de cambios de estado
       CREATE TABLE IF NOT EXISTS pinchazo_alert_history (
         id SERIAL PRIMARY KEY,
         alert_id INTEGER NOT NULL REFERENCES pinchazo_alerts(id) ON DELETE CASCADE,
@@ -168,15 +167,8 @@ WHERE is_active = true;
                       WHERE table_name = 'users' AND column_name = 'role') THEN
           ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user';
           
-          -- Actualizar roles existentes según la lógica actual
           UPDATE users SET role = 'premium' 
           WHERE id IN (SELECT user_id FROM premium_subscriptions WHERE is_active = true);
-          
-          -- Asegurar que los administradores tengan el rol correcto
-          -- Ajusta según tu lógica actual de administradores
-          -- UPDATE users SET role = 'admin' WHERE is_admin = true;
-          
-          -- Agregar restricción CHECK
           ALTER TABLE users 
           ADD CONSTRAINT users_role_check 
           CHECK (role IN ('user', 'admin', 'premium', 'staff', 'gomero'));
