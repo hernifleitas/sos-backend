@@ -8,7 +8,7 @@ const {
 } = require('../notifications');
 
 // Middleware para autenticación
-const authService = require('./authService');
+const {authService} = require('./auth');
 
 // Enviar alerta de pinchazo
 router.post('/pinchazo', authService.authenticateToken, async (req, res) => {
