@@ -13,7 +13,7 @@ const { authenticateToken } = require('./auth');
 // Enviar alerta de pinchazo
 router.post('/pinchazo', authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.user; // Asumiendo que el token JWT incluye el userId
+    const userId = req.user.id;
     const { location } = req.body;
     
     // Validar ubicación
@@ -53,7 +53,7 @@ router.post('/pinchazo', authenticateToken, async (req, res) => {
 router.post('/pinchazo/:alertId/accept', authenticateToken, async (req, res) => {
   try {
     const { alertId } = req.params;
-    const { userId } = req.user; // ID del gomero
+    const userId = req.user.id;
 
     // Verificar que el usuario es un gomero
     const gomero = await database.getUserById(userId);
@@ -89,7 +89,7 @@ router.post('/pinchazo/:alertId/accept', authenticateToken, async (req, res) => 
 // Obtener alertas de pinchazo activas (para gomeros)
 router.get('/pinchazo/active', authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.user;
+    const userId = req.user.id;
     
     // Verificar que el usuario es un gomero
     const user = await database.getUserById(userId);
@@ -108,7 +108,7 @@ router.get('/pinchazo/active', authenticateToken, async (req, res) => {
 // Obtener historial de alertas de un usuario
 router.get('/pinchazo/history', authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.user;
+    const userId = req.user.id;
     const alerts = await database.getUserPinchazoAlerts(userId);
     res.json(alerts);
   } catch (error) {
@@ -121,7 +121,7 @@ router.get('/pinchazo/history', authenticateToken, async (req, res) => {
 router.post('/pinchazo/:alertId/cancel', authenticateToken, async (req, res) => {
   try {
     const { alertId } = req.params;
-    const { userId } = req.user;
+    const userId = req.user.id;
 
     // Verificar que el usuario es el dueño de la alerta
     const alert = await database.getPinchazoAlert(alertId);
