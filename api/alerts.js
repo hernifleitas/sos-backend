@@ -20,7 +20,11 @@ router.post('/pinchazo', authService.authenticateToken.bind(authService), async 
     }
 
     // Obtener datos del usuario
-    const user = await database.getUserById(userId);
+    const userResult = await database.pool.query(
+  'SELECT id, nombre, email, role FROM users WHERE id = $1',
+  [userId]
+);
+const user = userResult.rows[0];
     if (!user) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
