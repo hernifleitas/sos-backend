@@ -9,7 +9,7 @@ const {
 const {authService} = require('./auth');
 
 // Enviar alerta de pinchazo
-router.post('/pinchazo', authService.authenticateToken.bind, async (req, res) => {
+router.post('/pinchazo', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
     const userId = req.user.id;
     const { location } = req.body;
@@ -48,7 +48,7 @@ router.post('/pinchazo', authService.authenticateToken.bind, async (req, res) =>
 });
 
 // Aceptar alerta de pinchazo (para gomeros)
-router.post('/pinchazo/:alertId/accept', authService.authenticateToken.bind, async (req, res) => {
+router.post('/pinchazo/:alertId/accept', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
     const { alertId } = req.params;
     const userId = req.user.id;
@@ -85,7 +85,7 @@ router.post('/pinchazo/:alertId/accept', authService.authenticateToken.bind, asy
 });
 
 // Obtener alertas de pinchazo activas (para gomeros)
-router.get('/pinchazo/active', authService.authenticateToken.bind, async (req, res) => {
+router.get('/pinchazo/active', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -104,7 +104,7 @@ router.get('/pinchazo/active', authService.authenticateToken.bind, async (req, r
 });
 
 // Obtener historial de alertas de un usuario
-router.get('/pinchazo/history', authService.authenticateToken.bind, async (req, res) => {
+router.get('/pinchazo/history', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
     const userId = req.user.id;
     const alerts = await database.getUserPinchazoAlerts(userId);
@@ -116,7 +116,7 @@ router.get('/pinchazo/history', authService.authenticateToken.bind, async (req, 
 });
 
 // Cancelar alerta de pinchazo
-router.post('/pinchazo/:alertId/cancel', authService.authenticateToken.bind, async (req, res) => {
+router.post('/pinchazo/:alertId/cancel', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
     const { alertId } = req.params;
     const userId = req.user.id;
