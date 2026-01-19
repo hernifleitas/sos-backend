@@ -30,16 +30,6 @@ router.post('/message', authService.authenticateToken.bind(authService), async (
       return res.status(400).json({ success: false, message: 'El mensaje no puede estar vacío' });
     }
 
-    // Verificar permisos (Premium o Admin)
-    const isPremium = await database.isPremium(userId);
-    const isAdmin = await database.isAdmin(userId);
-    const isStaff = await database.isStaff(userId);
-    if (!isPremium && !isAdmin && !isStaff) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Se requiere suscripción Premium para enviar mensajes' 
-      });
-    }
 
     // Obtener información del usuario
     const userInfo = await database.findUserById(userId);
@@ -71,7 +61,7 @@ router.post('/message', authService.authenticateToken.bind(authService), async (
     try {
       // Obtener todos los usuarios excepto el remitente
       const allUsers = await database.getAllUsers();
-      const recipients = allUsers.filter(u => u.id !== userId);
+      const recipients = (allUsers || []).filter(u => u.id !== userId);
       
       // Enviar notificación a cada destinatario
       for (const recipient of recipients) {

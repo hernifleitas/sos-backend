@@ -7,7 +7,7 @@ module.exports = function initChat(io) {
   const nsp = io.of('/chat');
 
   // Middleware de autenticación para el namespace /chat
-  nsp.use((socket, next) => {
+  nsp.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token
         || (socket.handshake.headers?.authorization?.split(' ')[1])
@@ -17,9 +17,19 @@ module.exports = function initChat(io) {
       const decoded = authService.verifyToken(token);
       if (!decoded) return next(new Error('forbidden'));
 
+      const isAdmin = await database.isStaffOrAdmin(decoded.id);
+      const isPremium = await database.isPremium(decoded.id);
+
+      // Permitir si es admin o premium
+      if (!isAdmin && !isPremium) {
+        // Comentado para permitir a todos los usuarios
+        // return next(new Error('Premium requerido'));
+      }
+
       socket.user = decoded; // { id, email, nombre }
       return next();
     } catch (e) {
+      console.error('Error en middleware de chat:', e);
       return next(new Error('forbidden'));
     }
   });
@@ -39,14 +49,6 @@ module.exports = function initChat(io) {
           return;
         }
 
-        // Check de Premium/Admin antes de permitir enviar
-        const hasPremium = await database.isPremium(socket.user.id);
-        const isAdmin = await database.isAdmin(socket.user.id);
-        const isStaff = await database.isStaff(socket.user.id)
-        if (!hasPremium && !isAdmin && !isStaff) {
-          if (ack) ack({ success: false, message: 'Función Premium requerida' });
-          return;
-        }
 
         // Persistir
         const insert = await database.addMessage(socket.user.id, content, targetRoom);
@@ -70,11 +72,7 @@ module.exports = function initChat(io) {
      try {
   // Obtener todos los usuarios excepto el emisor
   const allUsers = await database.getAllUsers();
-  const recipients = allUsers.filter(u => u.id !== socket.user.id);
-
-  if (recipients.length > 0) {
-    console.log(`Enviando notificación de chat a ${recipients.length} usuarios.`);
-  }
+  const recipients = (allUsers || []).filter(u => u.id !== socket.user.id);
 
   for (const recipient of recipients) {
     await notifications.sendChatNotification(

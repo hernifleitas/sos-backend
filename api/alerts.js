@@ -151,4 +151,16 @@ router.post('/pinchazo/:alertId/cancel', authService.authenticateToken.bind(auth
   }
 });
 
+// Obtener historial de alertas SOS de un usuario
+router.get('/history', authService.authenticateToken.bind(authService), async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const alerts = await database.getSosAlertHistory(userId);
+    res.json(alerts);
+  } catch (error) {
+    console.error('Error obteniendo historial de alertas SOS:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 module.exports = router;

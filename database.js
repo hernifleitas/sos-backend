@@ -245,11 +245,24 @@ await client.query(`
       WHEN (OLD.status IS DISTINCT FROM NEW.status)
       EXECUTE FUNCTION log_pinchazo_alert_change();
     `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sos_alerts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('robo', 'accidente')),
+        lat DECIMAL(10, 8) NOT NULL,
+        lng DECIMAL(11, 8) NOT NULL,
+        fecha_hora TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
     await client.query('COMMIT');
-    console.log('Tablas de gomeros creadas con éxito');
+    console.log('Tablas de gomeros y SOS creadas con éxito');
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error creando tablas de gomeros:', error);
+    console.error('Error creando tablas:', error);
     throw error;
   } finally {
     client.release();
@@ -1103,6 +1116,34 @@ getPinchazoAlertHistory(alertId) {
     if (this.pool) {
       this.pool.end().catch((e) => console.error('Error cerrando pool PG:', e));
     }
+  }
+
+  // =================== SOS ALERTS ===================
+
+  createSosAlert(alertData) {
+    return (async () => {
+      const { userId, tipo, lat, lng, fechaHora } = alertData;
+      const sql = `
+        INSERT INTO sos_alerts (user_id, tipo, lat, lng, fecha_hora)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, user_id, tipo, lat, lng, fecha_hora
+      `;
+      const { rows } = await this.pool.query(sql, [userId, tipo, lat, lng, fechaHora]);
+      return rows[0];
+    })();
+  }
+
+  getSosAlertHistory(userId) {
+    return (async () => {
+      const sql = `
+        SELECT id, tipo, lat, lng, fecha_hora
+        FROM sos_alerts
+        WHERE user_id = $1
+        ORDER BY fecha_hora DESC
+      `;
+      const { rows } = await this.pool.query(sql, [userId]);
+      return rows;
+    })();
   }
 }
 

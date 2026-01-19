@@ -10,6 +10,7 @@ const chatRoutes = require('./api/chat');
 const notificationsRoutes = require('./api/notifications');
 const notifications = require('./notifications');
 const premiumRoutes = require('./api/premium');
+const analyticsRoutes = require('./api/analytics');
 const zonasPeligrosasRoutes = require('./api/zonas-peligrosas');
 const database = require('./database');
 
@@ -192,6 +193,29 @@ app.post("/sos", async (req, res) => {
                      ['robo', 'accidente'].includes(tipoAAlmacenar);
 
 if (esNotificable) {
+    // Guardar alerta SOS en la base de datos
+    try {
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1];
+      if (token) {
+        const jwt = require('jsonwebtoken');
+        const jwtSecret = process.env.JWT_SECRET || 'rider-sos-secret-key-2024';
+        const decoded = jwt.verify(token, jwtSecret);
+        if (decoded?.id) {
+          await database.createSosAlert({
+            userId: decoded.id,
+            tipo: tipoAAlmacenar,
+            lat: ubicacion.lat,
+            lng: ubicacion.lng,
+            fechaHora: new Date(fechaHora)
+          });
+        }
+      }
+    } catch (dbError) {
+      console.error('Error guardando alerta SOS en la base de datos:', dbError);
+      // No bloquear la respuesta por error de DB, solo loguear
+    }
+
     console.log('🚨 Enviando ALERTA por:', tipoAAlmacenar);
     notificarSOSAOtrosUsuarios({
       riderId,
@@ -363,10 +387,8 @@ app.get("/alertas", (req, res) => {
 
 // Configuración de rutas API
 const API_PREFIX = '/api';
-// Rutas de autenticación (sin prefijo para compatibilidad)
-app.use('/auth', authRoutes);
-
 app.use(`${API_PREFIX}/auth`, authRoutes);
+app.use(`${API_PREFIX}/analytics`, analyticsRoutes);
 // Rutas de chat
 app.use(`${API_PREFIX}/chat`, chatRoutes);
 // Rutas de notificaciones
