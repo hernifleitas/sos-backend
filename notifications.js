@@ -211,28 +211,26 @@ async function sendChatNotification(recipientId, message, senderName) {
 
 async function notifyGomerosAboutPinchazo(alertId, riderName, location) {
   try {
-    // Obtener gomeros cercanos (dentro de 10km por defecto)
     const gomeros = await database.getGomerosCercanos(location.lat, location.lng, 10);
-
     if (gomeros.length === 0) {
       console.log('No hay gomeros cercanos para notificar');
       return { success: false, sent: 0, error: 'No hay gomeros cercanos' };
     }
-    // Obtener tokens de los gomeros
-    const tokens = gomeros.map(g => g.expo_push_token).filter(Boolean);
+
+    const gomeroIds = gomeros.map(g => g.id);
+    const tokens = await database.getUsersDeviceTokens(gomeroIds);
+
+    if (tokens.length === 0) {
+        console.log('Los gomeros cercanos no tienen tokens de notificación.');
+        return { success: false, sent: 0, error: 'Gomeros sin tokens' };
+    }
 
     const title = '🚨 ¡Nueva alerta de pinchazo!';
     const body = `${riderName} necesita ayuda con un pinchazo cercano.`;
 
-    // Enviar notificación
     return await sendPush(tokens, title, body, {
       type: 'pinchazo_alert',
       alertId: alertId.toString(),
-      riderName,
-      location: JSON.stringify(location)
-    }, {
-      sound: 'default',
-      priority: 'high'
     });
   } catch (error) {
     console.error('Error notificando a gomeros:', error);
@@ -240,37 +238,48 @@ async function notifyGomerosAboutPinchazo(alertId, riderName, location) {
   }
 }
 
-/**
- * Notifica al rider que un gomero ha aceptado su solicitud
- */
 async function notifyRiderAboutGomero(alertId, gomeroName, gomeroPhone) {
   try {
-    // Obtener el rider de la alerta
-    const alert = await database.getPinchazoAlert(alertId);
-    if (!alert) {
-      throw new Error('Alerta no encontrada');
-    }
-    // Obtener token del rider
-    const rider = await database.getUserById(alert.user_id);
-    if (!rider || !rider.expo_push_token) {
-      throw new Error('No se pudo encontrar el token del rider');
-    }
+    const alert = await database.findPinchazoAlertById(alertId);
+    if (!alert) throw new Error('Alerta no encontrada');
+
+    const tokens = await database.getUserDeviceTokens(alert.user_id);
+    if (!tokens || tokens.length === 0) throw new Error('Rider no tiene tokens');
+
     const title = '✅ ¡Un gomero está en camino!';
     const body = `${gomeroName} ha aceptado tu solicitud. Teléfono: ${gomeroPhone}`;
 
-    return await sendPush([rider.expo_push_token], title, body, {
+    return await sendPush(tokens, title, body, {
       type: 'gomero_accepted',
       alertId: alertId.toString(),
       gomeroName,
       gomeroPhone
-    }, {
-      sound: 'default',
-      priority: 'high'
     });
   } catch (error) {
-    console.error('Error notificando al rider:', error);
+    console.error('Error notificando al rider sobre aceptación:', error);
     return { success: false, error: error.message };
   }
+}
+
+async function notifyRiderAboutGomeroRejection(alertId, gomeroName) {
+    try {
+        const alert = await database.findPinchazoAlertById(alertId);
+        if (!alert) throw new Error('Alerta no encontrada');
+
+        const tokens = await database.getUserDeviceTokens(alert.user_id);
+        if (!tokens || tokens.length === 0) throw new Error('Rider no tiene tokens');
+
+        const title = '⚠️ Un gomero ha rechazado tu solicitud';
+        const body = `${gomeroName} no está disponible. Estamos buscando otro gomero para ti.`;
+
+        return await sendPush(tokens, title, body, {
+            type: 'gomero_rejected',
+            alertId: alertId.toString(),
+        });
+    } catch (error) {
+        console.error('Error notificando al rider sobre rechazo:', error);
+        return { success: false, error: error.message };
+    }
 }
 
 async function getUnreadMessageCount(recipientId) {
@@ -284,5 +293,6 @@ module.exports = {
   sendChatNotification,
   getUnreadMessageCount,
   notifyGomerosAboutPinchazo,
-  notifyRiderAboutGomero
+  notifyRiderAboutGomero,
+  notifyRiderAboutGomeroRejection
 };

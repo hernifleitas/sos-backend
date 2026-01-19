@@ -3,7 +3,8 @@ const router = express.Router();
 const database = require('../database');
 const { 
   notifyGomerosAboutPinchazo, 
-  notifyRiderAboutGomero 
+  notifyRiderAboutGomero, 
+  notifyRiderAboutGomeroRejection 
 } = require('../notifications');
 
 const {authService} = require('./auth');
@@ -58,7 +59,7 @@ router.post('/pinchazo/:alertId/accept', authService.authenticateToken.bind(auth
     const userId = req.user.id;
 
     // Verificar que el usuario es un gomero
-    const gomero = await database.getUserById(userId);
+    const gomero = await database.findUserById(userId);
     if (gomero.role !== 'gomero') {
       return res.status(403).json({ error: 'Solo los gomeros pueden aceptar alertas' });
     }
@@ -91,19 +92,34 @@ router.post('/pinchazo/:alertId/accept', authService.authenticateToken.bind(auth
 // Obtener alertas de pinchazo activas (para gomeros)
 router.get('/pinchazo/active', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
+    console.log('Solicitud recibida en /pinchazo/active');
     const userId = req.user.id;
+    console.log('Usuario autenticado ID:', userId);
     
     // Verificar que el usuario es un gomero
     const user = await database.getUserById(userId);
+    console.log('Datos del usuario:', user);
+    
     if (user.role !== 'gomero') {
+      console.log('Acceso denegado: el usuario no es un gomero');
       return res.status(403).json({ error: 'Acceso denegado' });
     }
-
+    console.log('Obteniendo alertas activas...');
     const alerts = await database.getGomeroPinchazoAlerts(userId, 'pending');
+    console.log('Alertas encontradas:', alerts.length);
+    
     res.json(alerts);
   } catch (error) {
-    console.error('Error obteniendo alertas activas:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error('Error detallado en /pinchazo/active:', {
+      message: error.message,
+      stack: error.stack,
+      error: error
+    });
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
