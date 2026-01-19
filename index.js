@@ -387,7 +387,9 @@ app.get("/alertas", (req, res) => {
 
 // Configuración de rutas API
 const API_PREFIX = '/api';
-app.use(`${API_PREFIX}/auth`, authRoutes);
+// Compatibilidad para clientes nuevos y antiguos
+app.use(`${API_PREFIX}/auth`, authRoutes); // Ruta nueva: /api/auth/...
+app.use('/auth', authRoutes);             // Ruta antigua: /auth/...
 app.use(`${API_PREFIX}/analytics`, analyticsRoutes);
 // Rutas de chat
 app.use(`${API_PREFIX}/chat`, chatRoutes);
