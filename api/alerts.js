@@ -97,7 +97,7 @@ router.get('/pinchazo/active', authService.authenticateToken.bind(authService), 
     console.log('Usuario autenticado ID:', userId);
     
     // Verificar que el usuario es un gomero
-    const user = await database.getUserById(userId);
+    const user = await database.findUserById(userId);
     console.log('Datos del usuario:', user);
     
     if (user.role !== 'gomero') {
