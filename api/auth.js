@@ -291,27 +291,31 @@ async requireGomeroOrStaff(req, res, next) {
   }
 
   // Middleware para verificar autenticación
-  authenticateToken(req, res, next) {
+  async authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token de acceso requerido'
-      });
+      return res.status(401).json({ success: false, message: 'Token de acceso requerido' });
     }
 
     const decoded = this.verifyToken(token);
     if (!decoded) {
-      return res.status(403).json({
-        success: false,
-        message: 'Token inválido o expirado'
-      });
+      return res.status(403).json({ success: false, message: 'Token inválido o expirado' });
     }
 
-    req.user = decoded;
-    next();
+    try {
+      const user = await database.findUserById(decoded.id);
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+      }
+
+      req.user = user; // Adjuntar el objeto de usuario completo
+      next();
+    } catch (error) {
+      console.error('Error en authenticateToken al buscar usuario:', error);
+      return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    }
   }
 
   // Middleware para verificar si es administrador

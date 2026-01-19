@@ -166,14 +166,12 @@ async function sendChatNotification(recipientId, message, senderName) {
     // Obtener el usuario y sus tokens
     const user = await database.findUserById(recipientId);
     if (!user) {
-      console.log('Usuario no encontrado para notificación de chat');
       return { success: false, error: 'User not found' };
     }
 
     // Obtener tokens del usuario
     const tokens = await database.getUserDeviceTokens(recipientId);
     if (!tokens || tokens.length === 0) {
-      console.log('Usuario no tiene tokens de notificación');
       return { success: false, error: 'No device tokens' };
     }
 

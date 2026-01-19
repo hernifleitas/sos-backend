@@ -7,7 +7,7 @@ module.exports = function initChat(io) {
   const nsp = io.of('/chat');
 
   // Middleware de autenticación para el namespace /chat
-  nsp.use(async (socket, next) => {
+  nsp.use((socket, next) => {
     try {
       const token = socket.handshake.auth?.token
         || (socket.handshake.headers?.authorization?.split(' ')[1])
@@ -17,19 +17,12 @@ module.exports = function initChat(io) {
       const decoded = authService.verifyToken(token);
       if (!decoded) return next(new Error('forbidden'));
 
-      const isAdmin = await database.isStaffOrAdmin(decoded.id);
-      const isPremium = await database.isPremium(decoded.id);
-
-      // Permitir si es admin o premium
-      if (!isAdmin && !isPremium) {
-        // Comentado para permitir a todos los usuarios
-        // return next(new Error('Premium requerido'));
-      }
+      // La verificación de premium se ha eliminado para permitir el chat a todos.
+      // En el futuro, esta lógica se puede restaurar si es necesario.
 
       socket.user = decoded; // { id, email, nombre }
       return next();
     } catch (e) {
-      console.error('Error en middleware de chat:', e);
       return next(new Error('forbidden'));
     }
   });
