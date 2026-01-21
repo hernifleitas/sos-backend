@@ -944,15 +944,26 @@ updatePinchazoAlertStatus(alertId, status, gomeroId = null) {
   return (async () => {
     const result = await this.pool.query(
       `UPDATE pinchazo_alerts
-       SET status = $1,
-           gomero_id = CASE WHEN $2 IS NOT NULL THEN $2 ELSE gomero_id END,
-           updated_at = NOW(),
-           completed_at = CASE WHEN $1 = 'completed' THEN NOW() ELSE completed_at END,
-           canceled_at = CASE WHEN $1 = 'cancelled' THEN NOW() ELSE canceled_at END
-       WHERE id = $3
+       SET
+         status = $1::varchar,
+         gomero_id = CASE
+           WHEN $2::integer IS NOT NULL THEN $2::integer
+           ELSE gomero_id
+         END,
+         updated_at = NOW(),
+         completed_at = CASE
+           WHEN $1::varchar = 'completed' THEN NOW()
+           ELSE completed_at
+         END,
+         canceled_at = CASE
+           WHEN $1::varchar = 'cancelled' THEN NOW()
+           ELSE canceled_at
+         END
+       WHERE id = $3::integer
        RETURNING *`,
       [status, gomeroId, alertId]
     );
+
     return result.rows[0] || null;
   })();
 }
