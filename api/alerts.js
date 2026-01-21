@@ -169,6 +169,25 @@ router.get('/pinchazo/active', authService.authenticateToken.bind(authService), 
   }
 });
 
+
+//Obtener el ID de la alerta activa .
+
+router.get('/pinchazo/:id', authService.authenticateToken.bind(authService), async (req, res) => {
+  try {
+    const alertId = req.params.id;
+    const result = await database.getPinchazoAlertById(alertId);
+    
+    if (!result) {
+      return res.status(404).json({ error: 'Alerta no encontrada' });
+    }
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error obteniendo alerta:', error);
+    res.status(500).json({ error: 'Error al obtener la alerta' });
+  }
+});
+
 // Obtener historial de alertas de un usuario
 router.get('/pinchazo/history', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
