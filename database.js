@@ -970,20 +970,22 @@ updatePinchazoAlertStatus(alertId, status, gomeroId = null) {
 
 findPinchazoAlertById(alertId) {
   return (async () => {
-    const result = await this.pool.query(
-      `SELECT pa.*,
-              u.nombre AS user_nombre,
-              u.telefono AS user_telefono
-       FROM pinchazo_alerts pa
-       JOIN users u ON pa.user_id = u.id
-       WHERE pa.id = $1`,
-      [alertId]
-    );
-
+    const result = await this.pool.query(`
+      SELECT 
+        pa.*,
+        u1.nombre as user_nombre, 
+        u1.telefono as user_telefono,
+        u2.id as gomero_id, 
+        u2.nombre as gomero_nombre, 
+        u2.telefono as gomero_telefono
+      FROM pinchazo_alerts pa
+      JOIN users u1 ON pa.user_id = u1.id
+      LEFT JOIN users u2 ON pa.gomero_id = u2.id
+      WHERE pa.id = $1
+    `, [alertId]);
     return result.rows[0] || null;
   })();
 }
-
 getUserPinchazoAlerts(userId) {
   return (async () => {
     const result = await this.pool.query(

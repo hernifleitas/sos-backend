@@ -181,7 +181,16 @@ router.get('/pinchazo/:id', authService.authenticateToken.bind(authService), asy
       return res.status(404).json({ error: 'Alerta no encontrada' });
     }
     
-    res.json(result);
+    const response = {
+      ...result,
+      gomero: result.gomero_id ? {
+        id: result.gomero_id,
+        nombre: result.gomero_nombre || 'Gomero',
+        telefono: result.gomero_telefono
+      } : null
+    };
+    
+    res.json(response);
   } catch (error) {
     console.error('Error obteniendo alerta:', error);
     res.status(500).json({ error: 'Error al obtener la alerta' });
