@@ -4,7 +4,8 @@ const database = require('../database');
 const { 
   notifyGomerosAboutPinchazo, 
   notifyRiderAboutGomero, 
-  notifyRiderAboutGomeroRejection 
+  notifyRiderAboutGomeroRejection,
+  
 } = require('../notifications');
 
 const {authService} = require('./auth');
@@ -79,7 +80,7 @@ router.post('/pinchazo/:alertId/accept',
       }
 
       notifyRiderAboutGomero(
-        alertId,
+        updatedAlert,
         gomero.nombre || 'Un gomero',
         gomero.telefono || ''
       ).catch(console.error);
@@ -118,7 +119,7 @@ router.post('/pinchazo/:alertId/accept',
         null
       );
 
-      notifyRiderAboutGomeroRejection(alertId)
+      notifyRiderAboutGomeroRejection(updatedAlert)
         .catch(console.error);
 
       res.json({
@@ -187,7 +188,7 @@ router.post('/pinchazo/:alertId/cancel', authService.authenticateToken.bind(auth
     const userId = req.user.id;
 
     // Verificar que el usuario es el dueño de la alerta
-    const alert = await database.getPinchazoAlert(alertId);
+    const alert = await database.findPinchazoAlertById(alertId);
     if (!alert) {
       return res.status(404).json({ error: 'Alerta no encontrada' });
     }

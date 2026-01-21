@@ -238,48 +238,54 @@ async function notifyGomerosAboutPinchazo(alertId, riderName, location) {
   }
 }
 
-async function notifyRiderAboutGomero(alertId, gomeroName, gomeroPhone) {
+async function notifyRiderAboutGomero(alert, gomeroName, gomeroPhone) {
   try {
-    const alert = await database.findPinchazoAlertById(alertId);
-    if (!alert) throw new Error('Alerta no encontrada');
+    if (!alert) throw new Error('Alerta inválida');
 
     const tokens = await database.getUserDeviceTokens(alert.user_id);
-    if (!tokens || tokens.length === 0) throw new Error('Rider no tiene tokens');
+    if (!tokens || tokens.length === 0) {
+      throw new Error('Rider no tiene tokens');
+    }
 
     const title = '✅ ¡Un gomero está en camino!';
     const body = `${gomeroName} ha aceptado tu solicitud. Teléfono: ${gomeroPhone}`;
 
     return await sendPush(tokens, title, body, {
       type: 'gomero_accepted',
-      alertId: alertId.toString(),
+      alertId: alert.id.toString(),
       gomeroName,
       gomeroPhone
     });
+
   } catch (error) {
     console.error('Error notificando al rider sobre aceptación:', error);
     return { success: false, error: error.message };
   }
 }
 
-async function notifyRiderAboutGomeroRejection(alertId, gomeroName) {
-    try {
-        const alert = await database.findPinchazoAlertById(alertId);
-        if (!alert) throw new Error('Alerta no encontrada');
 
-        const tokens = await database.getUserDeviceTokens(alert.user_id);
-        if (!tokens || tokens.length === 0) throw new Error('Rider no tiene tokens');
 
-        const title = '⚠️ Un gomero ha rechazado tu solicitud';
-        const body = `${gomeroName} no está disponible. Estamos buscando otro gomero para ti.`;
+async function notifyRiderAboutGomeroRejection(alert) {
+  try {
+    if (!alert) throw new Error('Alerta inválida');
 
-        return await sendPush(tokens, title, body, {
-            type: 'gomero_rejected',
-            alertId: alertId.toString(),
-        });
-    } catch (error) {
-        console.error('Error notificando al rider sobre rechazo:', error);
-        return { success: false, error: error.message };
+    const tokens = await database.getUserDeviceTokens(alert.user_id);
+    if (!tokens || tokens.length === 0) {
+      throw new Error('Rider no tiene tokens');
     }
+
+    const title = '❌ Solicitud rechazada';
+    const body = 'Un gomero rechazó tu solicitud. Buscando otro disponible...';
+
+    return await sendPush(tokens, title, body, {
+      type: 'gomero_rejected',
+      alertId: alert.id.toString()
+    });
+
+  } catch (error) {
+    console.error('Error notificando al rider sobre rechazo:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 async function getUnreadMessageCount(recipientId) {
