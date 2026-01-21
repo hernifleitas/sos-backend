@@ -55,11 +55,16 @@ const user = userResult.rows[0];
 // Aceptar alerta de pinchazo (para gomeros)
 router.post('/pinchazo/:alertId/accept', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
+    console.log('GOMERO:', gomero);
+    
     const { alertId } = req.params;
     const userId = req.user.id;
 
     // Verificar que el usuario es un gomero
     const gomero = await database.findUserById(userId);
+    if (!gomero) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
     if (gomero.role !== 'gomero') {
       return res.status(403).json({ error: 'Solo los gomeros pueden aceptar alertas' });
     }
@@ -74,6 +79,43 @@ router.post('/pinchazo/:alertId/accept', authService.authenticateToken.bind(auth
     if (!updatedAlert) {
       return res.status(404).json({ error: 'Alerta no encontrada o ya fue tomada' });
     }
+
+    //reject 
+
+    router.post('/pinchazo/:alertId/reject', authService.authenticateToken.bind(authService), async (req, res) => {
+  try {
+    const { alertId } = req.params;
+    const userId = req.user.id;
+
+    const gomero = await database.findUserById(userId);
+    if (!gomero) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    if (gomero.role !== 'gomero') {
+      return res.status(403).json({ error: 'Solo los gomeros pueden rechazar alertas' });
+    }
+
+    const updatedAlert = await database.updatePinchazoAlertStatus(
+      alertId,
+      'pending',
+      null
+    );
+
+    notifyRiderAboutGomeroRejection(alertId)
+      .catch(err => console.error(err));
+
+    res.json({
+      ...updatedAlert,
+      message: 'Has rechazado la alerta'
+    });
+
+  } catch (error) {
+    console.error('Error rechazando alerta:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+    
 
     // Notificar al rider (en segundo plano)
     notifyRiderAboutGomero(alertId, gomero.nombre || 'Un gomero', gomero.telefono || '')
