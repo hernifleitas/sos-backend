@@ -175,7 +175,7 @@ router.get('/pinchazo/active', authService.authenticateToken.bind(authService), 
 router.get('/pinchazo/:id', authService.authenticateToken.bind(authService), async (req, res) => {
   try {
     const alertId = req.params.id;
-    const result = await database.getPinchazoAlertById(alertId);
+    const result = await database.findPinchazoAlertById(alertId);
     
     if (!result) {
       return res.status(404).json({ error: 'Alerta no encontrada' });
