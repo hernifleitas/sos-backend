@@ -968,6 +968,22 @@ updatePinchazoAlertStatus(alertId, status, gomeroId = null) {
   })();
 }
 
+findPinchazoAlertById(alertId) {
+  return (async () => {
+    const result = await this.pool.query(
+      `SELECT pa.*,
+              u.nombre AS user_nombre,
+              u.telefono AS user_telefono
+       FROM pinchazo_alerts pa
+       JOIN users u ON pa.user_id = u.id
+       WHERE pa.id = $1`,
+      [alertId]
+    );
+
+    return result.rows[0] || null;
+  })();
+}
+
 getUserPinchazoAlerts(userId) {
   return (async () => {
     const result = await this.pool.query(
