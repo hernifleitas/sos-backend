@@ -218,7 +218,7 @@ async function notifyGomerosAboutPinchazo(alertId, riderName, location) {
     }
 
     const gomeroIds = gomeros.map(g => g.id);
-    const tokens = await database.getUsersDeviceTokens(gomeroIds);
+    const tokens = await database.getUserDeviceTokens(gomeroIds);
 
     if (tokens.length === 0) {
         console.log('Los gomeros cercanos no tienen tokens de notificación.');
