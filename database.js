@@ -943,24 +943,42 @@ createPinchazoAlert(alertData) {
 updatePinchazoAlertStatus(alertId, status, gomeroId = null) {
   return (async () => {
     const result = await this.pool.query(
-      `UPDATE pinchazo_alerts
-       SET
-         status = $1::varchar,
-         gomero_id = CASE
-           WHEN $2::integer IS NOT NULL THEN $2::integer
-           ELSE gomero_id
-         END,
-         updated_at = NOW(),
-         completed_at = CASE
-           WHEN $1::varchar = 'completed' THEN NOW()
-           ELSE completed_at
-         END,
-         canceled_at = CASE
-           WHEN $1::varchar = 'cancelled' THEN NOW()
-           ELSE canceled_at
-         END
-       WHERE id = $3::integer
-       RETURNING *`,
+      `
+      UPDATE pinchazo_alerts
+      SET
+        status = $1::varchar,
+
+        gomero_id = CASE
+          WHEN $1::varchar = 'cancelled' THEN NULL
+          WHEN $2::integer IS NOT NULL THEN $2::integer
+          ELSE gomero_id
+        END,
+
+        updated_at = NOW(),
+
+        completed_at = CASE
+          WHEN $1::varchar = 'completed' THEN NOW()
+          ELSE completed_at
+        END,
+
+        canceled_at = CASE
+          WHEN $1::varchar = 'cancelled' THEN NOW()
+          ELSE canceled_at
+        END
+
+      WHERE id = $3::integer
+        AND (
+          -- aceptar solo si está pendiente
+          ($1 = 'accepted' AND status = 'pending')
+          OR
+          -- cancelar solo si está activa
+          ($1 = 'cancelled' AND status IN ('pending','accepted','on_way'))
+          OR
+          -- otros cambios válidos
+          ($1 IN ('on_way','arrived','completed'))
+        )
+      RETURNING *
+      `,
       [status, gomeroId, alertId]
     );
 

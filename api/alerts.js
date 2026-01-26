@@ -11,47 +11,72 @@ const {
 const {authService} = require('./auth');
 
 // Enviar alerta de pinchazo
-router.post('/pinchazo', authService.authenticateToken.bind(authService), async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { location } = req.body;
-    
-    // Validar ubicación
-    if (!location || !location.lat || !location.lng) {
-      return res.status(400).json({ error: 'Ubicación inválida' });
+router.post(
+  '/pinchazo',
+  authService.authenticateToken.bind(authService),
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { location } = req.body;
+
+      // Validar ubicación
+      if (!location || !location.lat || !location.lng) {
+        return res.status(400).json({ error: 'Ubicación inválida' });
+      }
+
+      // 1️⃣ CANCELAR ALERTAS VIEJAS
+      await database.pool.query(
+        `
+        UPDATE pinchazo_alerts
+        SET
+          status = 'cancelled',
+          gomero_id = NULL,
+          canceled_at = NOW(),
+          updated_at = NOW()
+        WHERE user_id = $1
+          AND status IN ('pending', 'accepted', 'on_way')
+        `,
+        [userId]
+      );
+
+      // Obtener usuario
+      const userResult = await database.pool.query(
+        'SELECT id, nombre FROM users WHERE id = $1',
+        [userId]
+      );
+      const user = userResult.rows[0];
+
+      if (!user) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
+      // 2️⃣ CREAR NUEVA ALERTA
+      const result = await database.createPinchazoAlert({
+        userId,
+        lat: location.lat,
+        lng: location.lng,
+        notes: req.body.notes
+      });
+
+      // 3️⃣ NOTIFICAR GOMEROS
+      notifyGomerosAboutPinchazo(
+        result.id,
+        user.nombre || 'Un usuario',
+        location
+      ).catch(err =>
+        console.error('Error notificando a gomeros:', err)
+      );
+
+      res.status(201).json({
+        ...result,
+        message: 'Alerta de pinchazo creada correctamente'
+      });
+    } catch (error) {
+      console.error('Error creando alerta de pinchazo:', error);
+      res.status(500).json({ error: 'Error interno del servidor' });
     }
-
-    // Obtener datos del usuario
-    const userResult = await database.pool.query(
-  'SELECT id, nombre, email, role FROM users WHERE id = $1',
-  [userId]
-);
-const user = userResult.rows[0];
-    if (!user) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
-
-    // Crear alerta
-    const result = await database.createPinchazoAlert({
-      userId,
-      lat: location.lat,
-      lng: location.lng,
-      notes: req.body.notes
-    });
-
-    // Notificar a gomeros cercanos (en segundo plano)
-    notifyGomerosAboutPinchazo(result.id, user.nombre || 'Un usuario', location)
-      .catch(error => console.error('Error notificando a gomeros:', error));
-
-    res.status(201).json({
-      ...result,
-      message: 'Alerta de pinchazo creada correctamente'
-    });
-  } catch (error) {
-    console.error('Error creando alerta de pinchazo:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
   }
-});
+);
 
 // Aceptar alerta de pinchazo (para gomeros)
 router.post('/pinchazo/:alertId/accept',
