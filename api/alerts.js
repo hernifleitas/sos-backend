@@ -142,23 +142,40 @@ router.post('/pinchazo/:alertId/completed',
       const { alertId } = req.params;
       const userId = req.user.id;
       
-      const user = await database.findUserById(userId);
-      if (!user || user.role !== 'gomero') {
+      // Verificar que el usuario es un gomero
+      const gomero = await database.findUserById(userId);
+      if (!gomero || gomero.role !== 'gomero') {
         return res.status(403).json({ error: 'Acceso denegado' });
       }
+      // Obtener la alerta actual
       const alert = await database.findPinchazoAlertById(alertId);
       if (!alert || alert.gomero_id !== userId) {
         return res.status(404).json({ error: 'Alerta no encontrada' });
       }
+      // Actualizar el estado
       const updatedAlert = await database.updatePinchazoAlertStatus(
         alertId,
         'completed',
         userId
       );
+      if (!updatedAlert) {
+        return res.status(400).json({ 
+          error: 'No se pudo marcar como completado. Verifica el estado actual de la alerta.' 
+        });
+      }
+      // Notificar al rider que el servicio fue completado
+      await notifyRiderAboutGomeroStatus(
+        alert,
+        'completed',
+        gomero.nombre || 'El gomero'
+      );
       res.json(updatedAlert);
     } catch (error) {
-      console.error('Error actualizando estado a completed:', error);
-      res.status(500).json({ error: 'Error interno del servidor' });
+      console.error('Error completando la alerta:', error);
+      res.status(500).json({ 
+        error: 'Error interno del servidor',
+        details: error.message 
+      });
     }
   }
 );
@@ -169,28 +186,47 @@ router.post('/pinchazo/:alertId/cancelled',
     try {
       const { alertId } = req.params;
       const userId = req.user.id;
+      const { reason } = req.body; // Opcional: motivo de la cancelación
       
-      const user = await database.findUserById(userId);
-      if (!user || user.role !== 'gomero') {
+      // Verificar que el usuario es un gomero
+      const gomero = await database.findUserById(userId);
+      if (!gomero || gomero.role !== 'gomero') {
         return res.status(403).json({ error: 'Acceso denegado' });
       }
+      // Obtener la alerta actual
       const alert = await database.findPinchazoAlertById(alertId);
       if (!alert) {
         return res.status(404).json({ error: 'Alerta no encontrada' });
       }
-      // Verificar que el usuario es el gomero asignado o el dueño de la alerta
-      if (alert.gomero_id !== userId && alert.user_id !== userId) {
+      // Verificar que el gomero es el asignado
+      if (alert.gomero_id !== userId) {
         return res.status(403).json({ error: 'No tienes permiso para cancelar esta alerta' });
       }
+      // Actualizar el estado
       const updatedAlert = await database.updatePinchazoAlertStatus(
         alertId,
         'cancelled',
-        null // Establecer gomero_id a null al cancelar
+        null
+      );
+      if (!updatedAlert) {
+        return res.status(400).json({ 
+          error: 'No se pudo cancelar la alerta. Verifica el estado actual.' 
+        });
+      }
+      // Notificar al rider que el servicio fue cancelado
+      await notifyRiderAboutGomeroStatus(
+        alert,
+        'cancelled',
+        gomero.nombre || 'El gomero',
+        reason || 'El servicio ha sido cancelado por el gomero'
       );
       res.json(updatedAlert);
     } catch (error) {
-      console.error('Error cancelando alerta:', error);
-      res.status(500).json({ error: 'Error interno del servidor' });
+      console.error('Error cancelando la alerta:', error);
+      res.status(500).json({ 
+        error: 'Error interno del servidor',
+        details: error.message 
+      });
     }
   }
 );
