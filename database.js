@@ -894,42 +894,41 @@ getGomeros() {
     );
   }
 
-getGomerosCercanos(lat, lng, radiusKm = 10) {
-  return (async () => {
-    const earthRadiusKm = 6371;
+async getGomerosCercanos(lat, lng, radiusKm = 10) {
+  const earthRadiusKm = 6371;
 
-    const query = `
-      SELECT *
-      FROM (
-        SELECT 
-          id,
-          nombre,
-          email,
-          telefono,
-          last_known_lat,
-          last_known_lng,
-          ${earthRadiusKm} * acos(
-            cos(radians($1)) *
-            cos(radians(last_known_lat)) *
-            cos(radians(last_known_lng) - radians($2)) +
-            sin(radians($1)) *
-            sin(radians(last_known_lat))
-          ) AS distance
-        FROM users
-        WHERE role = 'gomero'
-          AND is_active = TRUE
-          AND last_known_lat IS NOT NULL
-          AND last_known_lng IS NOT NULL
-      ) sub
-      WHERE distance <= $3
-      ORDER BY distance
-      LIMIT 20;
-    `;
+  const query = `
+    SELECT *
+    FROM (
+      SELECT
+        id,
+        nombre,
+        email,
+        telefono,
+        last_known_lat,
+        last_known_lng,
+        ${earthRadiusKm} * acos(
+          cos(radians($1)) *
+          cos(radians(last_known_lat)) *
+          cos(radians(last_known_lng) - radians($2)) +
+          sin(radians($1)) *
+          sin(radians(last_known_lat))
+        ) AS distance
+      FROM users
+      WHERE role = 'gomero'
+        AND is_active = TRUE
+        AND last_known_lat IS NOT NULL
+        AND last_known_lng IS NOT NULL
+    ) AS sub
+    WHERE distance <= $3
+    ORDER BY distance ASC
+    LIMIT 20;
+  `;
 
-    const result = await this.pool.query(query, [lat, lng, radiusKm]);
-    return result.rows;
-  })();
+  const result = await this.pool.query(query, [lat, lng, radiusKm]);
+  return result.rows;
 }
+
 
 
 createPinchazoAlert(alertData) {
