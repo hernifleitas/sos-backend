@@ -77,7 +77,123 @@ router.post(
     }
   }
 );
+// Actualizar estado de la alerta a 'on_way'
+router.post('/pinchazo/:alertId/on_way', 
+  authService.authenticateToken.bind(authService),
+  async (req, res) => {
+    try {
+      const { alertId } = req.params;
+      const userId = req.user.id;
+      
+      const user = await database.findUserById(userId);
+      if (!user || user.role !== 'gomero') {
+        return res.status(403).json({ error: 'Acceso denegado' });
+      }
+      const alert = await database.findPinchazoAlertById(alertId);
+      if (!alert || alert.gomero_id !== userId) {
+        return res.status(404).json({ error: 'Alerta no encontrada' });
+      }
+      const updatedAlert = await database.updatePinchazoAlertStatus(
+        alertId,
+        'on_way',
+        userId
+      );
+      res.json(updatedAlert);
+    } catch (error) {
+      console.error('Error actualizando estado a on_way:', error);
+      res.status(500).json({ error: 'Error interno del servidor' });
+    }
+  }
 
+);
+
+router.post('/pinchazo/:alertId/arrived', 
+  authService.authenticateToken.bind(authService),
+  async (req, res) => {
+    try {
+      const { alertId } = req.params;
+      const userId = req.user.id;
+      
+      const user = await database.findUserById(userId);
+      if (!user || user.role !== 'gomero') {
+        return res.status(403).json({ error: 'Acceso denegado' });
+      }
+      const alert = await database.findPinchazoAlertById(alertId);
+      if (!alert || alert.gomero_id !== userId) {
+        return res.status(404).json({ error: 'Alerta no encontrada' });
+      }
+      const updatedAlert = await database.updatePinchazoAlertStatus(
+        alertId,
+        'arrived',
+        userId
+      );
+      res.json(updatedAlert);
+    } catch (error) {
+      console.error('Error actualizando estado a arrived:', error);
+      res.status(500).json({ error: 'Error interno del servidor' });
+    }
+  }
+);
+// Actualizar estado de la alerta a 'completed'
+router.post('/pinchazo/:alertId/completed', 
+  authService.authenticateToken.bind(authService),
+  async (req, res) => {
+    try {
+      const { alertId } = req.params;
+      const userId = req.user.id;
+      
+      const user = await database.findUserById(userId);
+      if (!user || user.role !== 'gomero') {
+        return res.status(403).json({ error: 'Acceso denegado' });
+      }
+      const alert = await database.findPinchazoAlertById(alertId);
+      if (!alert || alert.gomero_id !== userId) {
+        return res.status(404).json({ error: 'Alerta no encontrada' });
+      }
+      const updatedAlert = await database.updatePinchazoAlertStatus(
+        alertId,
+        'completed',
+        userId
+      );
+      res.json(updatedAlert);
+    } catch (error) {
+      console.error('Error actualizando estado a completed:', error);
+      res.status(500).json({ error: 'Error interno del servidor' });
+    }
+  }
+);
+// Actualizar estado de la alerta a 'cancelled'
+router.post('/pinchazo/:alertId/cancelled', 
+  authService.authenticateToken.bind(authService),
+  async (req, res) => {
+    try {
+      const { alertId } = req.params;
+      const userId = req.user.id;
+      
+      const user = await database.findUserById(userId);
+      if (!user || user.role !== 'gomero') {
+        return res.status(403).json({ error: 'Acceso denegado' });
+      }
+      const alert = await database.findPinchazoAlertById(alertId);
+      if (!alert) {
+        return res.status(404).json({ error: 'Alerta no encontrada' });
+      }
+      // Verificar que el usuario es el gomero asignado o el dueño de la alerta
+      if (alert.gomero_id !== userId && alert.user_id !== userId) {
+        return res.status(403).json({ error: 'No tienes permiso para cancelar esta alerta' });
+      }
+      const updatedAlert = await database.updatePinchazoAlertStatus(
+        alertId,
+        'cancelled',
+        null // Establecer gomero_id a null al cancelar
+      );
+      res.json(updatedAlert);
+    } catch (error) {
+      console.error('Error cancelando alerta:', error);
+      res.status(500).json({ error: 'Error interno del servidor' });
+    }
+  }
+);
 // Aceptar alerta de pinchazo (para gomeros)
 router.post('/pinchazo/:alertId/accept',
   authService.authenticateToken.bind(authService),
