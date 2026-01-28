@@ -1135,18 +1135,25 @@ getPinchazoAlertHistory(alertId) {
     })();
   }
 
-  getUserDeviceTokens(userIds) {
+ async getUserDeviceTokens(userIds) {
   const ids = Array.isArray(userIds) ? userIds : [userIds];
 
-  return this.pool.query(
+  console.log('[DB] getUserDeviceTokens → IDs:', ids);
+
+  const result = await this.pool.query(
     `
     SELECT token
-    FROM user_device_tokens
+    FROM device_tokens
     WHERE user_id = ANY($1::int[])
     `,
     [ids]
-  ).then(res => res.rows.map(r => r.token));
+  );
+
+  console.log('[DB] Tokens encontrados:', result.rows.length);
+
+  return result.rows.map(r => r.token);
 }
+
 
 
   getAllTokens() {
