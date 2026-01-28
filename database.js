@@ -1135,15 +1135,19 @@ getPinchazoAlertHistory(alertId) {
     })();
   }
 
-  getUserDeviceTokens(userId) {
-    return (async () => {
-      const { rows } = await this.pool.query(
-        'SELECT token FROM device_tokens WHERE user_id = $1',
-        [userId]
-      );
-      return rows.map(r => r.token);
-    })();
-  }
+  getUserDeviceTokens(userIds) {
+  const ids = Array.isArray(userIds) ? userIds : [userIds];
+
+  return this.pool.query(
+    `
+    SELECT token
+    FROM user_device_tokens
+    WHERE user_id = ANY($1::int[])
+    `,
+    [ids]
+  ).then(res => res.rows.map(r => r.token));
+}
+
 
   getAllTokens() {
     return (async () => {
