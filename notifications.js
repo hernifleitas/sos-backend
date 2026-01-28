@@ -209,36 +209,37 @@ async function sendChatNotification(recipientId, message, senderName) {
   }
 }
 
-async function notifyGomerosAboutPinchazo(alertId, riderName, location) {
+async function notifyGomerosAboutPinchazo(alertId, riderName) {
   try {
-    const gomeros = await database.getGomerosCercanos(location.lat, location.lng, 10);
-    if (gomeros.length === 0) {
-      console.log('No hay gomeros cercanos para notificar');
-      return { success: false, sent: 0, error: 'No hay gomeros cercanos' };
+    const gomeros = await database.getGomerosActivos();
+
+    if (!gomeros || gomeros.length === 0) {
+      console.log('No hay gomeros activos para notificar');
+      return { success: false, sent: 0 };
     }
 
     const gomeroIds = gomeros.map(g => g.id);
     const tokens = await database.getUserDeviceTokens(gomeroIds);
 
-    if (tokens.length === 0) {
-        console.log('Los gomeros cercanos no tienen tokens de notificación.');
-        return { success: false, sent: 0, error: 'Gomeros sin tokens' };
+    if (!tokens || tokens.length === 0) {
+      console.log('Los gomeros no tienen tokens');
+      return { success: false, sent: 0 };
     }
 
     const title = '🚨 ¡Nueva alerta de pinchazo!';
-    const body = `${riderName} necesita ayuda con un pinchazo cercano.`;
+    const body = `${riderName} necesita ayuda ahora`;
 
     return await sendPush(tokens, title, body, {
       type: 'pinchazo_alert',
       alertId: alertId.toString(),
     });
+
   } catch (error) {
     console.error('Error notificando a gomeros:', error);
     return { success: false, error: error.message };
-    
   }
-  
 }
+
 
 
 async function notifyRiderAboutGomero(alert, gomeroName, gomeroPhone) {

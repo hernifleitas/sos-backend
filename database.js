@@ -929,6 +929,16 @@ async getGomerosCercanos(lat, lng, radiusKm = 10) {
   return result.rows;
 }
 
+getGomerosActivos() {
+  return this.pool.query(`
+    SELECT id
+    FROM users
+    WHERE role = 'gomero'
+      AND is_active = true
+      AND status = 'approved'
+  `).then(res => res.rows);
+}
+
 
 
 createPinchazoAlert(alertData) {
