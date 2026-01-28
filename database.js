@@ -883,48 +883,54 @@ getGomeros() {
   })();
 }
 
+ async updateUserLocation(userId, lat, lng) {
+    return this.pool.query(
+      `UPDATE users
+       SET last_known_lat = $1,
+           last_known_lng = $2,
+           updated_at = NOW()
+       WHERE id = $3`,
+      [lat, lng, userId]
+    );
+  }
+
 getGomerosCercanos(lat, lng, radiusKm = 10) {
   return (async () => {
-    // Radio de la Tierra en kilómetros
     const earthRadiusKm = 6371;
-    
+
     const query = `
-      SELECT 
-        id, 
-        nombre, 
-        email, 
-        telefono,
-        last_known_lat, 
-        last_known_lng,
-        ${earthRadiusKm} * 
-          acos(
-            cos(radians($1)) * 
-            cos(radians(last_known_lat)) * 
-            cos(radians(last_known_lng) - radians($2)) + 
-            sin(radians($1)) * 
+      SELECT *
+      FROM (
+        SELECT 
+          id,
+          nombre,
+          email,
+          telefono,
+          last_known_lat,
+          last_known_lng,
+          ${earthRadiusKm} * acos(
+            cos(radians($1)) *
+            cos(radians(last_known_lat)) *
+            cos(radians(last_known_lng) - radians($2)) +
+            sin(radians($1)) *
             sin(radians(last_known_lat))
           ) AS distance
-      FROM users
-      WHERE role = 'gomero' 
-        AND is_active = TRUE
-        AND last_known_lat IS NOT NULL
-        AND last_known_lng IS NOT NULL
-      HAVING ${earthRadiusKm} * 
-        acos(
-          cos(radians($1)) * 
-          cos(radians(last_known_lat)) * 
-          cos(radians(last_known_lng) - radians($2)) + 
-          sin(radians($1)) * 
-          sin(radians(last_known_lat))
-        ) <= $3
+        FROM users
+        WHERE role = 'gomero'
+          AND is_active = TRUE
+          AND last_known_lat IS NOT NULL
+          AND last_known_lng IS NOT NULL
+      ) sub
+      WHERE distance <= $3
       ORDER BY distance
-      LIMIT 20
+      LIMIT 20;
     `;
-    
+
     const result = await this.pool.query(query, [lat, lng, radiusKm]);
     return result.rows;
   })();
 }
+
 
 createPinchazoAlert(alertData) {
   return (async () => {

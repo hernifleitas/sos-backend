@@ -235,8 +235,11 @@ async function notifyGomerosAboutPinchazo(alertId, riderName, location) {
   } catch (error) {
     console.error('Error notificando a gomeros:', error);
     return { success: false, error: error.message };
+    
   }
+  
 }
+
 
 async function notifyRiderAboutGomero(alert, gomeroName, gomeroPhone) {
   try {
