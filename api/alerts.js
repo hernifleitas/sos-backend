@@ -85,35 +85,54 @@ router.post('/pinchazo/:alertId/on_way',
       const { alertId } = req.params;
       const userId = req.user.id;
 
+      console.log('=== DEBUG ON_WAY ===');
+      console.log('Alert ID:', alertId);
+      console.log('User ID:', userId);
+
       const user = await database.findUserById(userId);
+      console.log('User role:', user?.role);
+      
       if (!user || user.role !== 'gomero') {
+        console.log('ERROR: Usuario no es gomero');
         return res.status(403).json({ error: 'Acceso denegado' });
       }
 
       const alert = await database.findPinchazoAlertById(alertId);
+      console.log('Alert found:', alert);
+      console.log('Alert status:', alert?.status);
+      console.log('Alert gomero_id:', alert?.gomero_id);
+      
       if (!alert || alert.gomero_id !== userId) {
+        console.log('ERROR: Alerta no encontrada o no pertenece al gomero');
         return res.status(404).json({ error: 'Alerta no encontrada' });
       }
 
+      console.log('Intentando actualizar a on_way...');
       const updatedAlert = await database.updatePinchazoAlertStatus(
         alertId,
         'on_way',
         userId
       );
+      console.log('Updated alert:', updatedAlert);
 
       if (!updatedAlert) {
+        console.log('ERROR: No se pudo actualizar la alerta');
         return res.status(400).json({
           error: 'No se pudo actualizar el estado. Verifica el estado actual de la alerta.'
         });
       }
+
+      console.log('Enviando notificación...');
       await notifyRiderAboutGomeroRejection({
         ...updatedAlert,
         user_id: alert.user_id
       }, 'on_way');
 
+      console.log('Respuesta enviada');
       res.json(updatedAlert);
     } catch (error) {
       console.error('Error actualizando estado a on_way:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({ error: 'Error interno del servidor' });
     }
   }
@@ -126,37 +145,54 @@ router.post('/pinchazo/:alertId/arrived',
       const { alertId } = req.params;
       const userId = req.user.id;
  
+      console.log('=== DEBUG ARRIVED ===');
+      console.log('Alert ID:', alertId);
+      console.log('User ID:', userId);
+ 
       const user = await database.findUserById(userId);
+      console.log('User role:', user?.role);
+      
       if (!user || user.role !== 'gomero') {
+        console.log('ERROR: Usuario no es gomero');
         return res.status(403).json({ error: 'Acceso denegado' });
       }
  
       const alert = await database.findPinchazoAlertById(alertId);
+      console.log('Alert found:', alert);
+      console.log('Alert status:', alert?.status);
+      console.log('Alert gomero_id:', alert?.gomero_id);
+      
       if (!alert || alert.gomero_id !== userId) {
+        console.log('ERROR: Alerta no encontrada o no pertenece al gomero');
         return res.status(404).json({ error: 'Alerta no encontrada' });
       }
  
+      console.log('Intentando actualizar a arrived...');
       const updatedAlert = await database.updatePinchazoAlertStatus(
         alertId,
         'arrived',
         userId
       );
+      console.log('Updated alert:', updatedAlert);
  
       if (!updatedAlert) {
+        console.log('ERROR: No se pudo actualizar la alerta');
         return res.status(400).json({
           error: 'No se pudo actualizar el estado. Verifica el estado actual de la alerta.'
         });
       }
  
-      // Notificar al rider ANTES de responder
+      console.log('Enviando notificación...');
       await notifyRiderAboutGomeroRejection({
         ...updatedAlert,
         user_id: alert.user_id
       }, 'arrived');
  
+      console.log('Respuesta enviada');
       res.json(updatedAlert);
     } catch (error) {
       console.error('Error actualizando estado a arrived:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({ error: 'Error interno del servidor' });
     }
   }
