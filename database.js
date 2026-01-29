@@ -989,12 +989,8 @@ WHERE is_active = true;
     -- cancelar solo si está activa
     ($1 = 'cancelled' AND status IN ('pending','accepted','on_way'))
     OR
-    -- otros cambios válidos con validación de estado actual
-    ($1 = 'on_way' AND status = 'accepted')
-    OR
-    ($1 = 'arrived' AND status = 'on_way')
-    OR
-    ($1 = 'completed' AND status = 'arrived')
+    -- permitir otros cambios desde cualquier estado activo
+    ($1 IN ('on_way','arrived','completed') AND status IN ('pending','accepted','on_way','arrived'))
   )
       RETURNING *
       `,
