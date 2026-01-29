@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const database = require('../database');
-const { 
-  notifyGomerosAboutPinchazo, 
-  notifyRiderAboutGomero, 
+const {
+  notifyGomerosAboutPinchazo,
+  notifyRiderAboutGomero,
   notifyRiderAboutGomeroRejection,
-  
+
 } = require('../notifications');
 
-const {authService} = require('./auth');
+const { authService } = require('./auth');
 
 // Enviar alerta de pinchazo
 router.post(
@@ -78,13 +78,13 @@ router.post(
   }
 );
 // Actualizar estado de la alerta a 'on_way'
-router.post('/pinchazo/:alertId/on_way', 
+router.post('/pinchazo/:alertId/on_way',
   authService.authenticateToken.bind(authService),
   async (req, res) => {
     try {
       const { alertId } = req.params;
       const userId = req.user.id;
-      
+
       const user = await database.findUserById(userId);
       if (!user || user.role !== 'gomero') {
         return res.status(403).json({ error: 'Acceso denegado' });
@@ -107,13 +107,13 @@ router.post('/pinchazo/:alertId/on_way',
 
 );
 
-router.post('/pinchazo/:alertId/arrived', 
+router.post('/pinchazo/:alertId/arrived',
   authService.authenticateToken.bind(authService),
   async (req, res) => {
     try {
       const { alertId } = req.params;
       const userId = req.user.id;
-      
+
       const user = await database.findUserById(userId);
       if (!user || user.role !== 'gomero') {
         return res.status(403).json({ error: 'Acceso denegado' });
@@ -135,13 +135,13 @@ router.post('/pinchazo/:alertId/arrived',
   }
 );
 // Actualizar estado de la alerta a 'completed'
-router.post('/pinchazo/:alertId/completed', 
+router.post('/pinchazo/:alertId/completed',
   authService.authenticateToken.bind(authService),
   async (req, res) => {
     try {
       const { alertId } = req.params;
       const userId = req.user.id;
-      
+
       // Verificar que el usuario es un gomero
       const gomero = await database.findUserById(userId);
       if (!gomero || gomero.role !== 'gomero') {
@@ -159,35 +159,34 @@ router.post('/pinchazo/:alertId/completed',
         userId
       );
       if (!updatedAlert) {
-        return res.status(400).json({ 
-          error: 'No se pudo marcar como completado. Verifica el estado actual de la alerta.' 
+        return res.status(400).json({
+          error: 'No se pudo marcar como completado. Verifica el estado actual de la alerta.'
         });
       }
       // Notificar al rider que el servicio fue completado
-      await notifyRiderAboutGomeroStatus(
-        alert,
-        'completed',
-        gomero.nombre || 'El gomero'
-      );
+      await notifyRiderAboutGomeroRejection({
+        ...updatedAlert,
+        user_id: alert.user_id
+      }, 'completed')
       res.json(updatedAlert);
     } catch (error) {
       console.error('Error completando la alerta:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Error interno del servidor',
-        details: error.message 
+        details: error.message
       });
     }
   }
 );
 // Actualizar estado de la alerta a 'cancelled'
-router.post('/pinchazo/:alertId/cancelled', 
+router.post('/pinchazo/:alertId/cancelled',
   authService.authenticateToken.bind(authService),
   async (req, res) => {
     try {
       const { alertId } = req.params;
       const userId = req.user.id;
       const { reason } = req.body; // Opcional: motivo de la cancelación
-      
+
       // Verificar que el usuario es un gomero
       const gomero = await database.findUserById(userId);
       if (!gomero || gomero.role !== 'gomero') {
@@ -209,23 +208,21 @@ router.post('/pinchazo/:alertId/cancelled',
         null
       );
       if (!updatedAlert) {
-        return res.status(400).json({ 
-          error: 'No se pudo cancelar la alerta. Verifica el estado actual.' 
+        return res.status(400).json({
+          error: 'No se pudo cancelar la alerta. Verifica el estado actual.'
         });
       }
       // Notificar al rider que el servicio fue cancelado
-      await notifyRiderAboutGomeroStatus(
-        alert,
-        'cancelled',
-        gomero.nombre || 'El gomero',
-        reason || 'El servicio ha sido cancelado por el gomero'
-      );
+      await notifyRiderAboutGomeroRejection({
+        ...updatedAlert,
+        user_id: alert.user_id
+      }, 'cancelled');
       res.json(updatedAlert);
     } catch (error) {
       console.error('Error cancelando la alerta:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Error interno del servidor',
-        details: error.message 
+        details: error.message
       });
     }
   }
@@ -274,7 +271,7 @@ router.post('/pinchazo/:alertId/accept',
 );
 
 //rechazar 
-    router.post('/pinchazo/:alertId/reject',
+router.post('/pinchazo/:alertId/reject',
   authService.authenticateToken.bind(authService),
   async (req, res) => {
     try {
@@ -310,7 +307,7 @@ router.post('/pinchazo/:alertId/accept',
     }
   }
 );
- 
+
 
 // Obtener alertas de pinchazo activas (para gomeros)
 router.get('/pinchazo/active', authService.authenticateToken.bind(authService), async (req, res) => {
@@ -318,11 +315,11 @@ router.get('/pinchazo/active', authService.authenticateToken.bind(authService), 
     console.log('Solicitud recibida en /pinchazo/active');
     const userId = req.user.id;
     console.log('Usuario autenticado ID:', userId);
-    
+
     // Verificar que el usuario es un gomero
     const user = await database.findUserById(userId);
     console.log('Datos del usuario:', user);
-    
+
     if (user.role !== 'gomero') {
       console.log('Acceso denegado: el usuario no es un gomero');
       return res.status(403).json({ error: 'Acceso denegado' });
@@ -330,7 +327,7 @@ router.get('/pinchazo/active', authService.authenticateToken.bind(authService), 
     console.log('Obteniendo alertas activas...');
     const alerts = await database.getGomeroPinchazoAlerts(userId, 'pending');
     console.log('Alertas encontradas:', alerts.length);
-    
+
     res.json(alerts);
   } catch (error) {
     console.error('Error detallado en /pinchazo/active:', {
@@ -338,7 +335,7 @@ router.get('/pinchazo/active', authService.authenticateToken.bind(authService), 
       stack: error.stack,
       error: error
     });
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error interno del servidor',
       details: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
@@ -353,11 +350,11 @@ router.get('/pinchazo/:id', authService.authenticateToken.bind(authService), asy
   try {
     const alertId = req.params.id;
     const result = await database.findPinchazoAlertById(alertId);
-    
+
     if (!result) {
       return res.status(404).json({ error: 'Alerta no encontrada' });
     }
-    
+
     const response = {
       ...result,
       gomero: result.gomero_id ? {
@@ -366,7 +363,7 @@ router.get('/pinchazo/:id', authService.authenticateToken.bind(authService), asy
         telefono: result.gomero_telefono
       } : null
     };
-    
+
     res.json(response);
   } catch (error) {
     console.error('Error obteniendo alerta:', error);

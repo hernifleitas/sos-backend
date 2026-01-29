@@ -269,25 +269,43 @@ async function notifyRiderAboutGomero(alert, gomeroName, gomeroPhone) {
 
 
 
-async function notifyRiderAboutGomeroRejection(alert) {
+async function notifyRiderAboutGomeroRejection(alert, status = 'rejected') {
   try {
     if (!alert) throw new Error('Alerta inválida');
-
+ 
     const tokens = await database.getUserDeviceTokens(alert.user_id);
     if (!tokens || tokens.length === 0) {
       throw new Error('Rider no tiene tokens');
     }
-
-    const title = '❌ Solicitud rechazada';
-    const body = 'Un gomero rechazó tu solicitud. Buscando otro disponible...';
-
+ 
+    let title, body, notificationType;
+ 
+    switch (status) {
+      case 'completed':
+        title = '✅ Servicio Completado';
+        body = 'El gomero ha marcado el servicio como completado.';
+        notificationType = 'service_completed';
+        break;
+      case 'cancelled':
+        title = '❌ Servicio Cancelado';
+        body = 'El gomero ha cancelado el servicio.';
+        notificationType = 'service_cancelled';
+        break;
+      case 'rejected':
+      default:
+        title = '❌ Solicitud Rechazada';
+        body = 'Un gomero rechazó tu solicitud. Buscando otro disponible...';
+        notificationType = 'gomero_rejected';
+    }
+ 
     return await sendPush(tokens, title, body, {
-      type: 'gomero_rejected',
-      alertId: alert.id.toString()
+      type: notificationType,
+      alertId: alert.id.toString(),
+      status: status
     });
-
+ 
   } catch (error) {
-    console.error('Error notificando al rider sobre rechazo:', error);
+    console.error(`Error notificando al rider (${status}):`, error);
     return { success: false, error: error.message };
   }
 }
