@@ -123,10 +123,10 @@ WHERE is_active = true;
             EXECUTE FUNCTION set_updated_at();
           END IF;
         END $$;
-      `); 
- // GOMERIA-MOVIL.
+      `);
+      // GOMERIA-MOVIL.
 
-       await client.query(`
+      await client.query(`
     
       CREATE TABLE IF NOT EXISTS pinchazo_alerts (
         id SERIAL PRIMARY KEY,
@@ -152,15 +152,15 @@ WHERE is_active = true;
         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
     `);
-// Crear índices
-    await client.query(`
+      // Crear índices
+      await client.query(`
       CREATE INDEX IF NOT EXISTS idx_pinchazo_alerts_status ON pinchazo_alerts(status);
       CREATE INDEX IF NOT EXISTS idx_pinchazo_alerts_user ON pinchazo_alerts(user_id);
       CREATE INDEX IF NOT EXISTS idx_pinchazo_alerts_gomero ON pinchazo_alerts(gomero_id);
       CREATE INDEX IF NOT EXISTS idx_pinchazo_alerts_created ON pinchazo_alerts(created_at);
     `);
-    // Verificar y agregar la columna 'role' si no existe
-    await client.query(`
+      // Verificar y agregar la columna 'role' si no existe
+      await client.query(`
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
@@ -176,8 +176,8 @@ WHERE is_active = true;
       END;
       $$;
     `);
-    // Crear función para actualizar automáticamente updated_at
-    await client.query(`
+      // Crear función para actualizar automáticamente updated_at
+      await client.query(`
       CREATE OR REPLACE FUNCTION update_updated_at_column()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -186,16 +186,16 @@ WHERE is_active = true;
       END;
       $$ LANGUAGE plpgsql;
     `);
-    // Crear trigger para pinchazo_alerts
-    await client.query(`
+      // Crear trigger para pinchazo_alerts
+      await client.query(`
       DROP TRIGGER IF EXISTS update_pinchazo_alerts_updated_at ON pinchazo_alerts;
       CREATE TRIGGER update_pinchazo_alerts_updated_at
       BEFORE UPDATE ON pinchazo_alerts
       FOR EACH ROW
       EXECUTE FUNCTION update_updated_at_column();
     `);
-    // Función para registrar cambios en el historial
-    await client.query(`
+      // Función para registrar cambios en el historial
+      await client.query(`
       CREATE OR REPLACE FUNCTION log_pinchazo_alert_change()
       RETURNS TRIGGER AS $$
       BEGIN
@@ -214,8 +214,8 @@ WHERE is_active = true;
       $$ LANGUAGE plpgsql;
     `);
 
-    // Tabla de gomeros
-await client.query(`
+      // Tabla de gomeros
+      await client.query(`
   DROP TABLE IF EXISTS gomeros CASCADE;
 
   CREATE TABLE gomeros (
@@ -236,8 +236,8 @@ await client.query(`
   CREATE INDEX idx_gomeros_location ON gomeros(current_lat, current_lng);
   CREATE INDEX idx_gomeros_user ON gomeros(user_id);
 `);
-    // Crear trigger para el historial
-    await client.query(`
+      // Crear trigger para el historial
+      await client.query(`
       DROP TRIGGER IF EXISTS trigger_log_pinchazo_alert_change ON pinchazo_alerts;
       CREATE TRIGGER trigger_log_pinchazo_alert_change
       AFTER UPDATE OF status ON pinchazo_alerts
@@ -246,7 +246,7 @@ await client.query(`
       EXECUTE FUNCTION log_pinchazo_alert_change();
     `);
 
-    await client.query(`
+      await client.query(`
       CREATE TABLE IF NOT EXISTS sos_alerts (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -258,16 +258,16 @@ await client.query(`
       );
     `);
 
-    await client.query('COMMIT');
-    console.log('Tablas de gomeros y SOS creadas con éxito');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error creando tablas:', error);
-    throw error;
-  } finally {
-    client.release();
+      await client.query('COMMIT');
+      console.log('Tablas de gomeros y SOS creadas con éxito');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Error creando tablas:', error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
-}
 
   // =================== MÉTODOS USUARIOS ===================
   createUser(userData) {
@@ -495,60 +495,60 @@ await client.query(`
   }
 
   // Verificar si un usuario es staff
-async isStaff(userId) {
-  const client = await this.pool.connect();
-  try {
-    const result = await client.query(
-      'SELECT role FROM users WHERE id = $1',
-      [userId]
-    );
+  async isStaff(userId) {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        'SELECT role FROM users WHERE id = $1',
+        [userId]
+      );
 
-    if (result.rows.length === 0) {
-      return false;
+      if (result.rows.length === 0) {
+        return false;
+      }
+
+      const userRole = result.rows[0].role;
+      return userRole === 'staff';
+    } catch (error) {
+      console.error('Error en isStaff:', error);
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const userRole = result.rows[0].role;
-    return userRole === 'staff';
-  } catch (error) {
-    console.error('Error en isStaff:', error);
-    throw error;
-  } finally {
-    client.release();
   }
-}
 
-// Verificar si es staff o admin (para verificar usuarios)
-async isStaffOrAdmin(userId) {
-  const client = await this.pool.connect();
-  try {
-    const result = await client.query(
-      'SELECT role FROM users WHERE id = $1',
-      [userId]
-    );
+  // Verificar si es staff o admin (para verificar usuarios)
+  async isStaffOrAdmin(userId) {
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query(
+        'SELECT role FROM users WHERE id = $1',
+        [userId]
+      );
 
-    if (result.rows.length === 0) {
-      return false;
+      if (result.rows.length === 0) {
+        return false;
+      }
+
+      const userRole = result.rows[0].role;
+      return userRole === 'staff' || userRole === 'admin';
+    } catch (error) {
+      console.error('Error en isStaffOrAdmin:', error);
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const userRole = result.rows[0].role;
-    return userRole === 'staff' || userRole === 'admin';
-  } catch (error) {
-    console.error('Error en isStaffOrAdmin:', error);
-    throw error;
-  } finally {
-    client.release();
   }
-}
 
-makeStaff(id) {
-  return (async () => {
-    const result = await this.pool.query(
-      'UPDATE users SET role = $1 WHERE id = $2',
-      ['staff', id]
-    );
-    return { changes: result.rowCount };
-  })();
-}
+  makeStaff(id) {
+    return (async () => {
+      const result = await this.pool.query(
+        'UPDATE users SET role = $1 WHERE id = $2',
+        ['staff', id]
+      );
+      return { changes: result.rowCount };
+    })();
+  }
 
   // Verificar si un usuario es administrador
   async isAdmin(userId) {
@@ -576,13 +576,13 @@ makeStaff(id) {
   async isPremium(userId) {
     const client = await this.pool.connect();
     try {
-    // 1. Verificar si el usuario es admin o staff (siempre premium)
-const adminOrStaffCheck = await client.query(
-  'SELECT role FROM users WHERE id = $1 AND role IN ($2, $3) AND is_active = TRUE',
-  [userId, 'admin', 'staff']
-);
+      // 1. Verificar si el usuario es admin o staff (siempre premium)
+      const adminOrStaffCheck = await client.query(
+        'SELECT role FROM users WHERE id = $1 AND role IN ($2, $3) AND is_active = TRUE',
+        [userId, 'admin', 'staff']
+      );
 
-if (adminOrStaffCheck.rows.length > 0) return true;
+      if (adminOrStaffCheck.rows.length > 0) return true;
 
       // 2. Verificar usuario premium con expiración
       const { rows } = await client.query(
@@ -871,19 +871,19 @@ if (adminOrStaffCheck.rows.length > 0) return true;
   }
 
   // =================== gomeria-movil ===================
-// Métodos para gomeros
-getGomeros() {
-  return (async () => {
-    const result = await this.pool.query(
-      `SELECT id, nombre, email, telefono, created_at 
+  // Métodos para gomeros
+  getGomeros() {
+    return (async () => {
+      const result = await this.pool.query(
+        `SELECT id, nombre, email, telefono, created_at 
        FROM users 
        WHERE role = 'gomero' AND is_active = TRUE`
-    );
-    return result.rows;
-  })();
-}
+      );
+      return result.rows;
+    })();
+  }
 
- async updateUserLocation(userId, lat, lng) {
+  async updateUserLocation(userId, lat, lng) {
     return this.pool.query(
       `UPDATE users
        SET last_known_lat = $1,
@@ -894,10 +894,10 @@ getGomeros() {
     );
   }
 
-async getGomerosCercanos(lat, lng, radiusKm = 10) {
-  const earthRadiusKm = 6371;
+  async getGomerosCercanos(lat, lng, radiusKm = 10) {
+    const earthRadiusKm = 6371;
 
-  const query = `
+    const query = `
     SELECT *
     FROM (
       SELECT
@@ -925,40 +925,40 @@ async getGomerosCercanos(lat, lng, radiusKm = 10) {
     LIMIT 20;
   `;
 
-  const result = await this.pool.query(query, [lat, lng, radiusKm]);
-  return result.rows;
-}
+    const result = await this.pool.query(query, [lat, lng, radiusKm]);
+    return result.rows;
+  }
 
-getGomerosActivos() {
-  return this.pool.query(`
+  getGomerosActivos() {
+    return this.pool.query(`
     SELECT id
     FROM users
     WHERE role = 'gomero'
       AND is_active = true
       AND status = 'approved'
   `).then(res => res.rows);
-}
+  }
 
 
 
-createPinchazoAlert(alertData) {
-  return (async () => {
-    const { userId, lat, lng, notes } = alertData;
-    const result = await this.pool.query(
-      `INSERT INTO pinchazo_alerts 
+  createPinchazoAlert(alertData) {
+    return (async () => {
+      const { userId, lat, lng, notes } = alertData;
+      const result = await this.pool.query(
+        `INSERT INTO pinchazo_alerts 
        (user_id, location_lat, location_lng, notes)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [userId, lat, lng, notes || null]
-    );
-    return result.rows[0];
-  })();
-}
+        [userId, lat, lng, notes || null]
+      );
+      return result.rows[0];
+    })();
+  }
 
-updatePinchazoAlertStatus(alertId, status, gomeroId = null) {
-  return (async () => {
-    const result = await this.pool.query(
-      `
+  updatePinchazoAlertStatus(alertId, status, gomeroId = null) {
+    return (async () => {
+      const result = await this.pool.query(
+        `
       UPDATE pinchazo_alerts
       SET
         status = $1::varchar,
@@ -981,29 +981,33 @@ updatePinchazoAlertStatus(alertId, status, gomeroId = null) {
           ELSE canceled_at
         END
 
-      WHERE id = $3::integer
-        AND (
-          -- aceptar solo si está pendiente
-          ($1 = 'accepted' AND status = 'pending')
-          OR
-          -- cancelar solo si está activa
-          ($1 = 'cancelled' AND status IN ('pending','accepted','on_way'))
-          OR
-          -- otros cambios válidos
-          ($1 IN ('on_way','arrived','completed'))
-        )
+     WHERE id = $3::integer
+  AND (
+    -- aceptar solo si está pendiente
+    ($1 = 'accepted' AND status = 'pending')
+    OR
+    -- cancelar solo si está activa
+    ($1 = 'cancelled' AND status IN ('pending','accepted','on_way'))
+    OR
+    -- otros cambios válidos con validación de estado actual
+    ($1 = 'on_way' AND status = 'accepted')
+    OR
+    ($1 = 'arrived' AND status = 'on_way')
+    OR
+    ($1 = 'completed' AND status = 'arrived')
+  )
       RETURNING *
       `,
-      [status, gomeroId, alertId]
-    );
+        [status, gomeroId, alertId]
+      );
 
-    return result.rows[0] || null;
-  })();
-}
+      return result.rows[0] || null;
+    })();
+  }
 
-findPinchazoAlertById(alertId) {
-  return (async () => {
-    const result = await this.pool.query(`
+  findPinchazoAlertById(alertId) {
+    return (async () => {
+      const result = await this.pool.query(`
       SELECT 
         pa.*,
         u1.nombre as user_nombre, 
@@ -1016,13 +1020,13 @@ findPinchazoAlertById(alertId) {
       LEFT JOIN users u2 ON pa.gomero_id = u2.id
       WHERE pa.id = $1
     `, [alertId]);
-    return result.rows[0] || null;
-  })();
-}
-getUserPinchazoAlerts(userId) {
-  return (async () => {
-    const result = await this.pool.query(
-      `SELECT pa.*, 
+      return result.rows[0] || null;
+    })();
+  }
+  getUserPinchazoAlerts(userId) {
+    return (async () => {
+      const result = await this.pool.query(
+        `SELECT pa.*, 
               u1.nombre as user_nombre, u1.telefono as user_telefono,
               u2.nombre as gomero_nombre, u2.telefono as gomero_telefono
        FROM pinchazo_alerts pa
@@ -1030,49 +1034,49 @@ getUserPinchazoAlerts(userId) {
        LEFT JOIN users u2 ON pa.gomero_id = u2.id
        WHERE pa.user_id = $1
        ORDER BY pa.created_at DESC`,
-      [userId]
-    );
-    return result.rows;
-  })();
-}
+        [userId]
+      );
+      return result.rows;
+    })();
+  }
 
-getGomeroPinchazoAlerts(gomeroId, status = null) {
-  return (async () => {
-    let query = `
+  getGomeroPinchazoAlerts(gomeroId, status = null) {
+    return (async () => {
+      let query = `
       SELECT pa.*, 
              u.nombre as user_nombre, u.telefono as user_telefono
       FROM pinchazo_alerts pa
       JOIN users u ON pa.user_id = u.id
       WHERE (pa.gomero_id = $1 OR (pa.gomero_id IS NULL AND pa.status = 'pending'))
     `;
-    
-    const params = [gomeroId];
-    
-    if (status) {
-      query += ' AND pa.status = $2';
-      params.push(status);
-    }
-    
-    query += ' ORDER BY pa.created_at DESC';
-    
-    const result = await this.pool.query(query, params);
-    return result.rows;
-  })();
-}
 
-getPinchazoAlertHistory(alertId) {
-  return (async () => {
-    const result = await this.pool.query(
-      `SELECT h.*, u.nombre as changed_by_name
+      const params = [gomeroId];
+
+      if (status) {
+        query += ' AND pa.status = $2';
+        params.push(status);
+      }
+
+      query += ' ORDER BY pa.created_at DESC';
+
+      const result = await this.pool.query(query, params);
+      return result.rows;
+    })();
+  }
+
+  getPinchazoAlertHistory(alertId) {
+    return (async () => {
+      const result = await this.pool.query(
+        `SELECT h.*, u.nombre as changed_by_name
        FROM pinchazo_alert_history h
        LEFT JOIN users u ON h.changed_by = u.id
        WHERE h.alert_id = $1
        ORDER BY h.created_at ASC`,
-      [alertId]
-    );
-    return result.rows;
-  })();
-}
+        [alertId]
+      );
+      return result.rows;
+    })();
+  }
 
   // =================== CHAT ===================
   addMessage(userId, content, room = 'global') {
@@ -1135,24 +1139,24 @@ getPinchazoAlertHistory(alertId) {
     })();
   }
 
- async getUserDeviceTokens(userIds) {
-  const ids = Array.isArray(userIds) ? userIds : [userIds];
+  async getUserDeviceTokens(userIds) {
+    const ids = Array.isArray(userIds) ? userIds : [userIds];
 
-  console.log('[DB] getUserDeviceTokens → IDs:', ids);
+    console.log('[DB] getUserDeviceTokens → IDs:', ids);
 
-  const result = await this.pool.query(
-    `
+    const result = await this.pool.query(
+      `
     SELECT token
     FROM device_tokens
     WHERE user_id = ANY($1::int[])
     `,
-    [ids]
-  );
+      [ids]
+    );
 
-  console.log('[DB] Tokens encontrados:', result.rows.length);
+    console.log('[DB] Tokens encontrados:', result.rows.length);
 
-  return result.rows.map(r => r.token);
-}
+    return result.rows.map(r => r.token);
+  }
 
 
 
