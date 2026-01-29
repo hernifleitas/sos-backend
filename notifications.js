@@ -272,38 +272,48 @@ async function notifyRiderAboutGomero(alert, gomeroName, gomeroPhone) {
 async function notifyRiderAboutGomeroRejection(alert, status = 'rejected') {
   try {
     if (!alert) throw new Error('Alerta inválida');
- 
+
     const tokens = await database.getUserDeviceTokens(alert.user_id);
     if (!tokens || tokens.length === 0) {
       throw new Error('Rider no tiene tokens');
     }
- 
+
     let title, body, notificationType;
- 
+
     switch (status) {
+      case 'on_way':
+        title = '🚗 Mecánico en camino';
+        body = 'El mecánico está en camino a tu ubicación.';
+        notificationType = 'gomero_on_way';
+        break;
+      case 'arrived':
+        title = '👨‍🔧 Mecánico ha llegado';
+        body = 'El mecánico ha llegado a tu ubicación.';
+        notificationType = 'gomero_arrived';
+        break;
       case 'completed':
         title = '✅ Servicio Completado';
-        body = 'El gomero ha marcado el servicio como completado.';
+        body = 'El mecánico ha marcado el servicio como completado.';
         notificationType = 'service_completed';
         break;
       case 'cancelled':
         title = '❌ Servicio Cancelado';
-        body = 'El gomero ha cancelado el servicio.';
+        body = 'El mecánico ha cancelado el servicio.';
         notificationType = 'service_cancelled';
         break;
       case 'rejected':
       default:
         title = '❌ Solicitud Rechazada';
-        body = 'Un gomero rechazó tu solicitud. Buscando otro disponible...';
+        body = 'Un mecánico rechazó tu solicitud. Buscando otro disponible...';
         notificationType = 'gomero_rejected';
     }
- 
+
     return await sendPush(tokens, title, body, {
       type: notificationType,
       alertId: alert.id.toString(),
       status: status
     });
- 
+
   } catch (error) {
     console.error(`Error notificando al rider (${status}):`, error);
     return { success: false, error: error.message };

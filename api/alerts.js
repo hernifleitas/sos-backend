@@ -34,7 +34,7 @@ router.post(
           canceled_at = NOW(),
           updated_at = NOW()
         WHERE user_id = $1
-          AND status IN ('pending', 'accepted', 'on_way')
+          AND status IN ('pending', 'accepted', 'on_way', 'arrived')
         `,
         [userId]
       );
@@ -89,22 +89,34 @@ router.post('/pinchazo/:alertId/on_way',
       if (!user || user.role !== 'gomero') {
         return res.status(403).json({ error: 'Acceso denegado' });
       }
+
       const alert = await database.findPinchazoAlertById(alertId);
       if (!alert || alert.gomero_id !== userId) {
         return res.status(404).json({ error: 'Alerta no encontrada' });
       }
+
       const updatedAlert = await database.updatePinchazoAlertStatus(
         alertId,
         'on_way',
         userId
       );
+
+      if (!updatedAlert) {
+        return res.status(400).json({
+          error: 'No se pudo actualizar el estado. Verifica el estado actual de la alerta.'
+        });
+      }
+      await notifyRiderAboutGomeroRejection({
+        ...updatedAlert,
+        user_id: alert.user_id
+      }, 'on_way');
+
       res.json(updatedAlert);
     } catch (error) {
       console.error('Error actualizando estado a on_way:', error);
       res.status(500).json({ error: 'Error interno del servidor' });
     }
   }
-
 );
 
 router.post('/pinchazo/:alertId/arrived',
@@ -113,20 +125,35 @@ router.post('/pinchazo/:alertId/arrived',
     try {
       const { alertId } = req.params;
       const userId = req.user.id;
-
+ 
       const user = await database.findUserById(userId);
       if (!user || user.role !== 'gomero') {
         return res.status(403).json({ error: 'Acceso denegado' });
       }
+ 
       const alert = await database.findPinchazoAlertById(alertId);
       if (!alert || alert.gomero_id !== userId) {
         return res.status(404).json({ error: 'Alerta no encontrada' });
       }
+ 
       const updatedAlert = await database.updatePinchazoAlertStatus(
         alertId,
         'arrived',
         userId
       );
+ 
+      if (!updatedAlert) {
+        return res.status(400).json({
+          error: 'No se pudo actualizar el estado. Verifica el estado actual de la alerta.'
+        });
+      }
+ 
+      // Notificar al rider ANTES de responder
+      await notifyRiderAboutGomeroRejection({
+        ...updatedAlert,
+        user_id: alert.user_id
+      }, 'arrived');
+ 
       res.json(updatedAlert);
     } catch (error) {
       console.error('Error actualizando estado a arrived:', error);
