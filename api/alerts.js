@@ -270,6 +270,11 @@ router.post('/pinchazo/:alertId/cancelled',
         'cancelled',
         null
       );
+      if (alert.gomero_id) {
+      await notifyGomeroAboutCancellation(alert.gomero_id, alert);
+    }
+ 
+    res.json({ message: 'Alerta cancelada', alert: updatedAlert });
       if (!updatedAlert) {
         return res.status(400).json({
           error: 'No se pudo cancelar la alerta. Verifica el estado actual.'

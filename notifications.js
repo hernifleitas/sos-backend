@@ -226,7 +226,7 @@ async function notifyGomerosAboutPinchazo(alertId, riderName) {
       return { success: false, sent: 0 };
     }
 
-    const title = '🚨 ¡Nueva alerta de pinchazo!';
+    const title = '🚨 ¡Nueva alerta mecanica!';
     const body = `${riderName} necesita ayuda ahora`;
 
     return await sendPush(tokens, title, body, {
@@ -267,7 +267,30 @@ async function notifyRiderAboutGomero(alert, gomeroName, gomeroPhone) {
   }
 }
 
-
+async function notifyGomeroAboutCancellation(gomeroId, alert) {
+  try {
+    // Obtener tokens del gomero
+    const gomeroTokens = await database.getUserDeviceTokens(gomeroId);
+    
+    if (!gomeroTokens || gomeroTokens.length === 0) {
+      console.log('Gomero no tiene tokens para notificación');
+      return { success: false, error: 'No tokens' };
+    }
+ 
+    const title = '❌ Servicio Cancelado';
+    const body = `El rider ha cancelado la solicitud de asistencia`;
+ 
+    return await sendPush(gomeroTokens, title, body, {
+      type: 'service_cancelled_by_rider',
+      alertId: alert.id.toString(),
+      status: 'cancelled'
+    });
+ 
+  } catch (error) {
+    console.error('Error notificando al gomero sobre cancelación:', error);
+    return { success: false, error: error.message };
+  }
+}
 
 async function notifyRiderAboutGomeroRejection(alert, status = 'rejected') {
   try {
