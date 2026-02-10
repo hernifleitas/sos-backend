@@ -247,16 +247,29 @@ WHERE is_active = true;
     `);
 
       await client.query(`
-      CREATE TABLE IF NOT EXISTS sos_alerts (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('robo', 'accidente')),
-        lat DECIMAL(10, 8) NOT NULL,
-        lng DECIMAL(11, 8) NOT NULL,
-        fecha_hora TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-    `);
+        CREATE TABLE IF NOT EXISTS sos_alerts (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('robo', 'accidente')),
+          lat DECIMAL(10, 8) NOT NULL,
+          lng DECIMAL(11, 8) NOT NULL,
+          fecha_hora TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS emergency_contacts (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          nombre VARCHAR(100) NOT NULL,
+          telefono VARCHAR(20) NOT NULL,
+          relacion VARCHAR(50) NOT NULL,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+      `);
 
       await client.query('COMMIT');
       console.log('Tablas de gomeros y SOS creadas con éxito');
@@ -1216,6 +1229,60 @@ WHERE is_active = true;
       `;
       const { rows } = await this.pool.query(sql, [userId]);
       return rows;
+    })();
+  }
+
+  // =================== CONTACTOS DE EMERGENCIA ===================
+
+  addEmergencyContact(contactData) {
+    return (async () => {
+      const { userId, nombre, telefono, relacion } = contactData;
+      const sql = `
+        INSERT INTO emergency_contacts (user_id, nombre, telefono, relacion)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, user_id, nombre, telefono, relacion, is_active, created_at
+      `;
+      const { rows } = await this.pool.query(sql, [userId, nombre, telefono, relacion]);
+      return rows[0];
+    })();
+  }
+
+  getEmergencyContacts(userId) {
+    return (async () => {
+      const sql = `
+        SELECT id, nombre, telefono, relacion, is_active, created_at
+        FROM emergency_contacts
+        WHERE user_id = $1 AND is_active = TRUE
+        ORDER BY created_at ASC
+      `;
+      const { rows } = await this.pool.query(sql, [userId]);
+      return rows;
+    })();
+  }
+
+  updateEmergencyContact(contactId, contactData) {
+    return (async () => {
+      const { nombre, telefono, relacion } = contactData;
+      const sql = `
+        UPDATE emergency_contacts
+        SET nombre = $1, telefono = $2, relacion = $3, updated_at = NOW()
+        WHERE id = $4
+        RETURNING id, nombre, telefono, relacion, updated_at
+      `;
+      const { rows } = await this.pool.query(sql, [nombre, telefono, relacion, contactId]);
+      return rows[0];
+    })();
+  }
+
+  deleteEmergencyContact(contactId) {
+    return (async () => {
+      const sql = `
+        UPDATE emergency_contacts
+        SET is_active = FALSE, updated_at = NOW()
+        WHERE id = $1
+      `;
+      const result = await this.pool.query(sql, [contactId]);
+      return { changes: result.rowCount };
     })();
   }
 }

@@ -8,11 +8,12 @@ const { Server } = require('socket.io');
 const { router: authRoutes } = require('./api/auth');
 const chatRoutes = require('./api/chat');
 const notificationsRoutes = require('./api/notifications');
-const notifications = require('./notifications');
 const premiumRoutes = require('./api/premium');
 const analyticsRoutes = require('./api/analytics');
 const zonasPeligrosasRoutes = require('./api/zonas-peligrosas');
+const emergencyContactsRoutes = require('./api/emergency-contacts');
 const database = require('./database');
+const whatsappService = require('./services/whatsapp');
 
 const app = express();
 app.use(express.json());
@@ -277,6 +278,39 @@ if (esNotificable) {
       } catch (e) {
         console.error('Error enviando push de SOS:', e);
       }
+
+      // Enviar mensajes WhatsApp a contactos de emergencia
+      try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        if (token) {
+          const jwt = require('jsonwebtoken');
+          const jwtSecret = process.env.JWT_SECRET || 'rider-sos-secret-key-2024';
+          const decoded = jwt.verify(token, jwtSecret);
+          if (decoded?.id) {
+            const emergencyContacts = await database.getEmergencyContacts(decoded.id);
+            if (emergencyContacts.length > 0) {
+              console.log(` Enviando WhatsApp a ${emergencyContacts.length} contactos de emergencia...`);
+              const whatsappResults = await whatsappService.sendToMultipleContacts(
+                emergencyContacts,
+                nombre,
+                tipoAAlmacenar,
+                ubicacion,
+                `${moto} (${color})`
+              );
+              
+              const successful = whatsappResults.filter(r => r.success).length;
+              const failed = whatsappResults.filter(r => !r.success).length;
+              
+              console.log(` WhatsApp enviados: ${successful},  Fallidos: ${failed}`);
+            } else {
+              console.log(' El usuario no tiene contactos de emergencia configurados');
+            }
+          }
+        }
+      } catch (whatsappError) {
+        console.error('Error enviando WhatsApp de emergencia:', whatsappError);
+      }
     }
 
     res.json({ success: true });
@@ -286,9 +320,7 @@ if (esNotificable) {
   }
 });
 
-
-const alertsRouter = require('./api/alerts');
-app.use('/api/alerts', alertsRouter);
+// ... resto del código ...
 
 // Endpoint para obtener riders activos
 app.get("/riders", (req, res) => {
@@ -397,6 +429,8 @@ app.use(`${API_PREFIX}/chat`, chatRoutes);
 app.use(`${API_PREFIX}/notifications`, notificationsRoutes);
 // Rutas de premium
 app.use(`${API_PREFIX}/premium`, premiumRoutes);
+// Rutas de contactos de emergencia
+app.use(`${API_PREFIX}/emergency-contacts`, emergencyContactsRoutes);
 
 // Middleware para verificar autenticación en rutas protegidas
 const authenticateToken = (req, res, next) => {
