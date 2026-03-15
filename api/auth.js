@@ -8,8 +8,7 @@ const emailService = require('../email');
 class AuthService {
   constructor() {
     this.jwtSecret = process.env.JWT_SECRET
-    this.jwtExpiresIn = '7d'; // Token válido por 7 días
-  }
+this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';  }
 
 
   async requireGomero(req, res, next) {

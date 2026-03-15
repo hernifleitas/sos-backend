@@ -75,6 +75,27 @@ const notificarSOSAOtrosUsuarios = (sosData) => {
 // Recibir ubicación/SOS
 app.post("/sos", async (req, res) => {
   try {
+    // 🔐 VALIDAR AUTENTICACIÓN PRIMERO
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ error: "Token de autenticación requerido" });
+    }
+    
+    const jwt = require('jsonwebtoken');
+    const jwtSecret = process.env.JWT_SECRET || 'rider-sos-secret-key-2024';
+    
+    let decoded;
+    try {
+      decoded = jwt.verify(token, jwtSecret);
+    } catch (jwtError) {
+      return res.status(403).json({ error: "Token inválido o expirado" });
+    }
+    
+    // Si llegamos aquí, el usuario está autenticado
+    req.user = decoded;
+    
     const { riderId, nombre, moto, color, ubicacion, fechaHora, tipo, tipoSOSActual, cancel, esActualizacion, esEmergencia } = req.body;
     // Validar sin rechazar coordenadas 0,0
     const latValida = typeof ubicacion?.lat === 'number' && !Number.isNaN(ubicacion.lat);
