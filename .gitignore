@@ -3,4 +3,6 @@
 node_modules
 android/
 ios/
+node_modules
+.env
 android/app/src/main/res/drawable-hdpi/t -a")aseMessagingService.kt
