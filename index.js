@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const rateLimit = require("express-rate-limit");
 require('dotenv').config();
 const bodyParser = require('body-parser');
 const path = require('path');
@@ -16,6 +17,12 @@ const database = require('./database');
 const whatsappService = require('./services/whatsapp');
 
 const app = express();
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100 // Limitar a 100 solicitudes por ventana de tiempo
+});
+
+app.use(limiter);
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -319,10 +326,8 @@ if (esNotificable) {
                 ubicacion,
                 `${moto} (${color})`
               );
-              
               const successful = whatsappResults.filter(r => r.success).length;
               const failed = whatsappResults.filter(r => !r.success).length;
-              
               console.log(` WhatsApp enviados: ${successful},  Fallidos: ${failed}`);
             } else {
               console.log(' El usuario no tiene contactos de emergencia configurados');
@@ -341,54 +346,78 @@ if (esNotificable) {
   }
 });
 
-// ... resto del código ...
-
 // Endpoint para obtener riders activos
-app.get("/riders", (req, res) => {
-  const now = Date.now();
-  const cincoMinutos = 5 * 60 * 1000;
-  const dosMinutos = 2 * 60 * 1000; // Para bandera verde después de cancelar SOS
+app.get("/riders", async (req, res) => {
+  try {
+    // VALIDAR AUTENTICACIÓN - cualquier usuario registrado puede ver riders
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ error: "Token de autenticación requerido" });
+    }
+    
+    const jwt = require('jsonwebtoken');
+    const jwtSecret = process.env.JWT_SECRET || 'rider-sos-secret-key-2024';
+    
+    let decoded;
+    try {
+      decoded = jwt.verify(token, jwtSecret);
+    } catch (jwtError) {
+      return res.status(403).json({ error: "Token inválido o expirado" });
+    }
+    
+    // Si llegamos aquí, es un usuario registrado válido
+    req.user = decoded;
+    
+    const now = Date.now();
+    const cincoMinutos = 5 * 60 * 1000;
+    const dosMinutos = 2 * 60 * 1000; // Para bandera verde después de cancelar SOS
 
-  const ridersArray = Object.keys(riders)
-    .filter((riderId) => {
-      const r = riders[riderId];
-      const tiempoInactivo = now - r.lastUpdate;
+    const ridersArray = Object.keys(riders)
+      .filter((riderId) => {
+        const r = riders[riderId];
+        const tiempoInactivo = now - r.lastUpdate;
 
-      const sosActivo = r.tipo && r.tipo !== "normal" && r.tipo !== "actualizacion";
-      // Mantener SOS activos visibles sin expirar por tiempo
-      if (sosActivo) return true;
+        const sosActivo = r.tipo && r.tipo !== "normal" && r.tipo !== "actualizacion";
+        // Mantener SOS activos visibles sin expirar por tiempo
+        if (sosActivo) return true;
 
-      // Si es tipo "normal" (bandera verde), solo mostrar por 2 minutos
-      if (r.tipo === "normal") {
-        return tiempoInactivo <= dosMinutos;
-      }
+        // Si es tipo "normal" (bandera verde), solo mostrar por 2 minutos
+        if (r.tipo === "normal") {
+          return tiempoInactivo <= dosMinutos;
+        }
 
-      // Si no hay tipo establecido, ocultar después de 5 minutos
-      return tiempoInactivo <= cincoMinutos;
-    })
-    .map((riderId) => {
-      const r = riders[riderId];
-      let tipoMostrar = r.tipo;
+        // Si no hay tipo establecido, ocultar después de 5 minutos
+        return tiempoInactivo <= cincoMinutos;
+      })
+      .map((riderId) => {
+        const r = riders[riderId];
+        let tipoMostrar = r.tipo;
 
-      // Si es tipo "normal" y han pasado más de 2 minutos, no mostrar
-      if (r.tipo === "normal" && (now - r.lastUpdate) > dosMinutos) {
-        return null;
-      }
+        // Si es tipo "normal" y han pasado más de 2 minutos, no mostrar
+        if (r.tipo === "normal" && (now - r.lastUpdate) > dosMinutos) {
+          return null;
+        }
 
-      return {
-        riderId,
-        lat: r.ubicacion.lat,
-        lng: r.ubicacion.lng,
-        tipo: tipoMostrar || null,
-        nombre: r.nombre,
-        moto: r.moto,
-        color: r.color,
-        fechaHora: r.fechaHora,
-      };
-    })
-    .filter(rider => rider !== null); // Filtrar los null
+        return {
+          riderId,
+          lat: r.ubicacion.lat,
+          lng: r.ubicacion.lng,
+          tipo: tipoMostrar || null,
+          nombre: r.nombre,
+          moto: r.moto,
+          color: r.color,
+          fechaHora: r.fechaHora,
+        };
+      })
+      .filter(rider => rider !== null); // Filtrar los null
 
-  res.json(ridersArray);
+    res.json(ridersArray);
+  } catch (error) {
+    console.error("Error en /riders:", error);
+    res.status(500).json({ error: "Error obteniendo riders" });
+  }
 });
 
 // Endpoint para obtener alertas SOS recientes
@@ -494,8 +523,8 @@ app.set('io', io);
 require('./chat')(io);
 
 server.listen(PORT, HOST, () => {
-  console.log(`🚀 Servidor Rider SOS corriendo en http://${HOST}:${PORT}`);
-  console.log(`📧 Sistema de emails configurado`);
-  console.log(`🔐 Autenticación JWT activa`);
-  console.log(`💬 Socket.IO listo para chat`);
+  console.log(` Servidor Rider SOS corriendo en http://${HOST}:${PORT}`);
+  console.log(` Sistema de emails configurado`);
+  console.log(` Autenticación JWT activa`);
+  console.log(` Socket.IO listo para chat`);
 });
