@@ -44,29 +44,7 @@ coordenadas: [
   [-34.81025, -58.43715]   // Suroeste
 ]
     },
-    // Local No devuelve efectivo - Mr Tasty Montegrande
-    {
-      id: "lOCAL MR TASTY",
-      nombre: 'Mr Tasty',
-      descripcion: 'Leandro N. Alem 108',
-      tipo: 'sin-efectivo',
-      coordenadas: [
-        [-34.81510, -58.46895],
-        [-34.81510, -58.46885],
-        [-34.81520, -58.46885],
-        [-34.81520, -58.46895]
-      ]
-    },
-
-     {
-      id: "local no devuelve efe",
-      nombre: 'Valence',
-      descripcion: 'Av. Dardo Rocha 220',
-      tipo: 'sin-efectivo',
-coordenadas: [
-  [-34.816772, -58.471819]
-]
-    },
+   
     // Zona peligrosa
     {
       id: "Lujan",
@@ -187,65 +165,7 @@ coordenadas: [
 ]
 
     },
-
-    {
-      id: "Local no devuelve efectivo",
-      nombre: 'Helados kupanaka',
-      descripcion: 'General paz 199',
-      tipo: 'sin-efectivo',
-    coordenadas: [
-  [-34.81888, -58.47378],
-  [-34.81888, -58.47342],
-  [-34.81898, -58.47342],
-  [-34.81898, -58.47378] 
-]
-    },  {
-      id: "local no devuelve efe",
-      nombre: 'Lomiteria popular',
-      descripcion: 'Emilio cardeza 162',
-      tipo: 'sin-efectivo',
-coordenadas: [
-  [-34.81700, -58.46498],  // Noroeste
-  [-34.81700, -58.46472],  // Noreste
-  [-34.81718, -58.46472],  // Sureste
-  [-34.81718, -58.46498]   // Suroeste
-]
-    },
-
-    {
-      id: "Panaderia artesanal guillon",
-      nombre: 'Victorina Pastelería Artesanal',
-      descripcion: 'Mendoza 199',
-      tipo: 'sin-efectivo',
-coordenadas: [
-  [-34.80453275040183, -58.44764225285436]
-
-]
-    },
-{
-      id: "Glace ",
-      nombre: 'GLACE',
-      descripcion: 'Hipólito Yrigoyen 92',
-      tipo: 'sin-efectivo',
-coordenadas: [
-  [-34.81542252315315, -58.46739587760027]
-
-]
-    },
-
-     {
-      id: "Mc. Cream eduardo arana",
-      nombre: 'Mc. Cream',
-      descripcion: 'Eduardo arana 141',
-      tipo: 'sin-efectivo',
-coordenadas: [
-  [-34.814548297041, -58.467291800617684],  // lat abajo, lng izquierda
-  [-34.814548297041, -58.467091800617684],  // lat abajo, lng derecha
-  [-34.814348297041, -58.467091800617684],  // lat arriba, lng derecha
-  [-34.814348297041, -58.467291800617684]   // lat arriba, lng izquierda
-]
-    },
-
++
     {
       id: "Pasando Fair Pantano etc",
       nombre: 'Zona peligrosa',
