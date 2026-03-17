@@ -17,12 +17,17 @@ const database = require('./database');
 const whatsappService = require('./services/whatsapp');
 
 const app = express();
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100 // Limitar a 100 solicitudes por ventana de tiempo
-});
-
-app.use(limiter);
+// Rate limiting desactivado temporalmente para pruebas
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutos
+//   max: 2000, // Aumentar a 2000 solicitudes (133 por minuto) - muy generoso
+//   message: {
+//     error: "Too many requests, please try again later."
+//   },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
+// app.use(limiter);
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
