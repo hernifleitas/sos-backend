@@ -5,6 +5,12 @@ class WhatsAppService {
     this.accountSid = process.env.TWILIO_ACCOUNT_SID;
     this.authToken = process.env.TWILIO_AUTH_TOKEN;
     this.whatsappNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+
+    console.log({
+      SID: this.accountSid,
+      TOKEN: this.authToken ? 'OK' : 'MISSING',
+      NUMBER: this.whatsappNumber
+    });
     
     if (this.accountSid && this.authToken && this.whatsappNumber) {
       this.client = twilio(this.accountSid, this.authToken);
@@ -15,6 +21,7 @@ class WhatsAppService {
       console.log('⚠️ Servicio WhatsApp deshabilitado - Faltan variables de entorno');
     }
   }
+  
 
   async sendEmergencyMessage(contactPhone, userName, alertType, userLocation, userMoto) {
     if (!this.isEnabled) {
