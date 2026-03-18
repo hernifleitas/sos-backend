@@ -110,11 +110,86 @@ class EmailService {
     }
   }
 
-// EMAIL DE ERROR 
-  async sendChatErrorNotice(user) {
+async sendChatErrorNotice(user) {
   const notice =
-    'Estamos teniendo inconvenientes con el chat de riders. ' +
-    'Para solucionarlo, cerrá sesión y volvé a iniciar sesión.';
+    'Muy pronto vas a poder agregar hasta 5 contactos de emergencia en la app.';
+
+  const htmlContent = `
+    <html>
+      <body style="font-family: Arial, sans-serif; background-color:#f4f4f4; padding:20px; margin:0;">
+        
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; margin:auto; background:#ffffff; border-radius:10px; overflow:hidden;">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background:#000000; color:#ffffff; padding:20px; text-align:center;">
+              <h2 style="margin:0;">Nueva función en camino.</h2>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:25px; color:#333;">
+              
+              <p>Hola ${user.nombre},</p>
+
+              <p>${notice}</p>
+
+              <p>
+                Cuando esta función esté disponible, vas a poder configurar contactos de confianza
+                para que reciban alertas automáticas en situaciones de emergencia.
+              </p>
+
+              <hr style="margin:20px 0;">
+
+              <h4>¿Cómo funciona?</h4>
+
+              <p>Al presionar:</p>
+
+              <ul>
+                <li>🚨 SOS Robo</li>
+                <li>🚑 SOS Accidente</li>
+              </ul>
+
+              <p>Se enviará automáticamente un mensaje por WhatsApp con:</p>
+
+              <ul>
+                <li>👤 Tu nombre</li>
+                <li>🏍️ Tu moto</li>
+                <li>🎨 Color</li>
+                <li>📍 Ubicación en tiempo real</li>
+                <li>⏰ Hora del evento</li>
+              </ul>
+
+              <p>
+                Esto permite avisar rápidamente a tus contactos ante cualquier situación.
+              </p>
+
+              <hr style="margin:20px 0;">
+
+              <p style="font-size:14px; color:#555;">
+                Te recomendamos configurar tus contactos de emergencia apenas la función esté disponible.
+              </p>
+
+              <p style="margin-top:30px;">
+                — Equipo Rider SOS
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f0f0f0; text-align:center; padding:15px; font-size:12px; color:#777;">
+              Mensaje automático. No responder.
+            </td>
+          </tr>
+
+        </table>
+
+      </body>
+    </html>
+  `;
 
   return this.client.sendTransacEmail({
     sender: {
@@ -122,21 +197,8 @@ class EmailService {
       email: process.env.EMAIL_FROM
     },
     to: [{ email: user.email, name: user.nombre }],
-    subject: '⚠️ Aviso importante – Rider SOS',
-    htmlContent: `
-      <html>
-        <body>
-          <h2>⚠️ Aviso importante</h2>
-          <p>Hola ${user.nombre},</p>
-
-          <p>${notice}</p>
-
-          <p><strong>Solución:</strong> cerrá sesión y volvé a iniciar sesión.</p>
-
-          <small>Rider SOS – mensaje automático</small>
-        </body>
-      </html>
-    `,
+    subject: '🚨– Contactos de emergencia',
+    htmlContent,
     textContent: notice
   });
 }
