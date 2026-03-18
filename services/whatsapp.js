@@ -1,4 +1,5 @@
 const twilio = require('twilio');
+const database = require('../database');
 
 class WhatsAppService {
   constructor() {
