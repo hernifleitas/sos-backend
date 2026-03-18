@@ -50,6 +50,27 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Obtener usuario para verificar rol y límite
+    const userResult = await database.pool.query(
+      'SELECT role FROM users WHERE id = $1',
+      [userId]
+    );
+    const user = userResult.rows[0];
+    
+    // Determinar límite según rol
+    const maxContacts = user.role === 'premium' ? 3 : 1;
+    
+    // Obtener contactos existentes
+    const existingContacts = await database.getEmergencyContacts(userId);
+    
+    // Validar límite
+    if (existingContacts.length >= maxContacts) {
+      return res.status(400).json({
+        success: false,
+        message: `Límite alcanzado. Máximo ${maxContacts} contactos de emergencia permitidos para tu plan.`
+      });
+    }
+
     const contact = await database.addEmergencyContact({
       userId,
       nombre,

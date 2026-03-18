@@ -34,46 +34,70 @@ class WhatsAppService {
     return `+549${cleaned}`;
   }
 
-  async sendEmergencyMessage(contactPhone, userName, alertType, userLocation, userMoto) {
+  async sendEmergencyMessage(emergencyContacts, userName, alertType, userLocation, userMoto) {
     if (!this.isEnabled) {
       console.log('WhatsApp no está configurado - Simulación');
-      return this.simulateMessage(contactPhone, userName, alertType, userLocation, userMoto);
+      return this.simulateMessage(emergencyContacts, userName, alertType, userLocation, userMoto);
     }
 
     try {
-      const formattedPhone = this.formatPhone(contactPhone);
+      // Obtener información del usuario para determinar límite
+      const userResult = await database.pool.query(
+        'SELECT role FROM users WHERE nombre = $1 LIMIT 1',
+        [userName]
+      );
+      const user = userResult.rows[0];
+      
+      // Determinar límite según rol
+      const maxContacts = user && user.role === 'premium' ? 3 : 1;
+      
+      // Limitar contactos según el plan
+      const limitedContacts = emergencyContacts.slice(0, maxContacts);
+      
+      if (limitedContacts.length === 0) {
+        console.log('No hay contactos de emergencia para notificar');
+        return { success: true, sent: 0 };
+      }
 
-      const templateSid = this.templates[alertType];
-      if (!templateSid) throw new Error('Tipo de alerta inválido');
+      console.log(`Enviando WhatsApp a ${limitedContacts.length} contactos de emergencia...`);
+      
+      const whatsappResults = await Promise.all(
+        limitedContacts.map(async (contact) => {
+          const formattedPhone = this.formatPhone(contact.telefono);
 
-      const googleMapsUrl = `https://maps.google.com/?q=${userLocation.lat},${userLocation.lng}`;
+          const templateSid = this.templates[alertType];
+          if (!templateSid) throw new Error('Tipo de alerta inválido');
 
-      const response = await this.client.messages.create({
-        from: 'whatsapp:+5491136566333',
-        to: `whatsapp:${formattedPhone}`,
-        contentSid: templateSid,
-        contentVariables: JSON.stringify({
-          "1": userName,
-          "2": userMoto,
-          "3": googleMapsUrl,
-          "4": new Date().toLocaleString('es-AR')
+          const googleMapsUrl = `https://maps.google.com/?q=${userLocation.lat},${userLocation.lng}`;
+
+          const response = await this.client.messages.create({
+            from: 'whatsapp:+5491136566333',
+            to: `whatsapp:${formattedPhone}`,
+            contentSid: templateSid,
+            contentVariables: JSON.stringify({
+              "1": userName,
+              "2": userMoto,
+              "3": googleMapsUrl,
+              "4": new Date().toLocaleString('es-AR')
+            })
+          });
+
+          console.log(`✅ Enviado a ${formattedPhone}: ${this.whatsappNumber}`, response.sid);
+
+          return {
+            success: true,
+            messageId: response.sid,
+            phone: formattedPhone
+          };
         })
-      });
+      );
 
-      console.log(`✅ Enviado a ${formattedPhone}: since${this.whatsappNumber}`, response.sid);
-
-      return {
-        success: true,
-        messageId: response.sid,
-        phone: formattedPhone
-      };
-
+      return whatsappResults;
     } catch (error) {
-      console.error(`❌ Error con ${contactPhone}:`, error.message);
+      console.error(`❌ Error al enviar mensajes de emergencia:`, error.message);
       return {
         success: false,
-        error: error.message,
-        phone: contactPhone
+        error: error.message
       };
     }
   }
@@ -82,9 +106,9 @@ class WhatsAppService {
   formatEmergencyMessage(userName, alertType, location, moto) {
     const alertEmoji = alertType === 'robo' ? '🚨' : '🚑';
     const alertText = alertType === 'robo' ? 'ROBO' : 'ACCIDENTE';
-
+    
     const googleMapsUrl = `https://maps.google.com/?q=${location.lat},${location.lng}`;
-
+    
     return `${alertEmoji} ALERTA DE EMERGENCIA - ${alertText}\n\n` +
            `👤 Nombre: ${userName}\n` +
            `🏍️ Moto: ${moto}\n` +
@@ -110,7 +134,6 @@ class WhatsAppService {
   // 🔥 MÁXIMO 3 CONTACTOS
   async sendToMultipleContacts(contacts, userName, alertType, userLocation, userMoto) {
     const results = [];
-
     const limitedContacts = contacts.slice(0, 3);
 
     for (const contact of limitedContacts) {
