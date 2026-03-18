@@ -49,7 +49,7 @@ class WhatsAppService {
       const googleMapsUrl = `https://maps.google.com/?q=${userLocation.lat},${userLocation.lng}`;
 
       const response = await this.client.messages.create({
-        from: `whatsapp:${this.whatsappNumber}`,
+        from: 'whatsapp:+5491136566333',
         to: `whatsapp:${formattedPhone}`,
         contentSid: templateSid,
         contentVariables: JSON.stringify({
@@ -60,7 +60,7 @@ class WhatsAppService {
         })
       });
 
-      console.log(`✅ Enviado a ${formattedPhone}:`, response.sid);
+      console.log(`✅ Enviado a ${formattedPhone}: since${this.whatsappNumber}`, response.sid);
 
       return {
         success: true,
