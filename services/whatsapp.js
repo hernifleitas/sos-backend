@@ -48,20 +48,22 @@ class WhatsAppService {
         [userName]
       );
       const user = userResult.rows[0];
-      
+
       // Determinar límite según rol
       const maxContacts = user && user.role === 'premium' ? 3 : 1;
-      
+
       // Limitar contactos según el plan
-      const limitedContacts = emergencyContacts.slice(0, maxContacts);
-      
+      const limitedContacts = Array.isArray(emergencyContacts)
+        ? emergencyContacts.slice(0, maxContacts)
+        : [];
+
       if (limitedContacts.length === 0) {
         console.log('No hay contactos de emergencia para notificar');
         return { success: true, sent: 0 };
       }
 
       console.log(`Enviando WhatsApp a ${limitedContacts.length} contactos de emergencia...`);
-      
+
       const whatsappResults = await Promise.all(
         limitedContacts.map(async (contact) => {
           const formattedPhone = this.formatPhone(contact.telefono);
@@ -107,15 +109,15 @@ class WhatsAppService {
   formatEmergencyMessage(userName, alertType, location, moto) {
     const alertEmoji = alertType === 'robo' ? '🚨' : '🚑';
     const alertText = alertType === 'robo' ? 'ROBO' : 'ACCIDENTE';
-    
+
     const googleMapsUrl = `https://maps.google.com/?q=${location.lat},${location.lng}`;
-    
+
     return `${alertEmoji} ALERTA DE EMERGENCIA - ${alertText}\n\n` +
-           `👤 Nombre: ${userName}\n` +
-           `🏍️ Moto: ${moto}\n` +
-           `📍 Ubicación: ${googleMapsUrl}\n` +
-           `⏰ Hora: ${new Date().toLocaleString('es-AR')}\n\n` +
-           `🆘 Contactar urgente.`;
+      `👤 Nombre: ${userName}\n` +
+      `🏍️ Moto: ${moto}\n` +
+      `📍 Ubicación: ${googleMapsUrl}\n` +
+      `⏰ Hora: ${new Date().toLocaleString('es-AR')}\n\n` +
+      `🆘 Contactar urgente.`;
   }
 
   simulateMessage(contactPhone, userName, alertType, userLocation, userMoto) {
