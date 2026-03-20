@@ -9,7 +9,7 @@ const { Server } = require('socket.io');
 const { router: authRoutes } = require('./api/auth');
 const chatRoutes = require('./api/chat');
 const notificationsRoutes = require('./api/notifications');
-//const notifications = require('./notifications');
+const notifications = require('./notifications');
 const premiumRoutes = require('./api/premium');
 const analyticsRoutes = require('./api/analytics');
 const zonasPeligrosasRoutes = require('./api/zonas-peligrosas');
@@ -35,6 +35,59 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 app.use('/api/zonas-peligrosas', zonasPeligrosasRoutes);
 
+
+// Webhook para respuestas de WhatsApp
+app.post('/api/whatsapp-webhook', (req, res) => {
+  try {
+    const { From, To, Body, MessageSid } = req.body;
+    
+    if (!Body || !From) {
+      return res.status(200).send('OK');
+    }
+
+    const message = Body.trim().toUpperCase();
+    const fromPhone = From.replace('whatsapp:', '');
+    
+    console.log(`📱 Mensaje recibido de ${fromPhone}: ${message}`);
+    
+    // Buscar contacto de emergencia pendiente
+    database.pool.query(`
+      SELECT * FROM emergency_contacts 
+      WHERE telefono = $1
+    `, [fromPhone])
+    .then(result => {
+      if (result.rows.length === 0) {
+        console.log(`❌ No se encontró contacto para ${fromPhone}`);
+        return res.status(200).send('OK');
+      }
+
+      const contact = result.rows[0];
+      
+      if (message === 'ACEPTAR') {
+        console.log(`✅ ${fromPhone} aceptó ser contacto de emergencia`);
+        
+        // Podrías agregar un campo "activo" a la tabla emergency_contacts
+        // UPDATE emergency_contacts SET activo = true WHERE id = $1
+        
+      } else if (message === 'RECHAZAR') {
+        console.log(`❌ ${fromPhone} rechazó ser contacto de emergencia`);
+        
+        // Podrías eliminar el contacto
+        // DELETE FROM emergency_contacts WHERE id = $1
+      }
+      
+      res.status(200).send('OK');
+    })
+    .catch(error => {
+      console.error('Error en webhook:', error);
+      res.status(500).send('ERROR');
+    });
+
+  } catch (error) {
+    console.error('Error procesando webhook:', error);
+    res.status(500).send('ERROR');
+  }
+});
 
 // Servir archivos estáticos de premium
 app.use('/premium', express.static(path.join(__dirname, 'public/premium')));

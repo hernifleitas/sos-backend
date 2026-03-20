@@ -110,9 +110,11 @@ class EmailService {
     }
   }
 
-async sendChatErrorNotice(user) {
+async sendUpdateNewsEmail(user) {
   const notice =
-    'Muy pronto vas a poder agregar hasta 5 contactos de emergencia en la app.';
+    'Rider SOS sigue creciendo, y ahora la comunidad es más importante que nunca.';
+
+  const appLink = 'https://play.google.com/store/apps/details?id=com.hernifleitas.sosapp&hl=es-US';
 
   const htmlContent = `
     <html>
@@ -123,7 +125,7 @@ async sendChatErrorNotice(user) {
           <!-- Header -->
           <tr>
             <td style="background:#000000; color:#ffffff; padding:20px; text-align:center;">
-              <h2 style="margin:0;">Nueva función en camino.</h2>
+              <h2 style="margin:0;">🔥 Rider SOS está evolucionando</h2>
             </td>
           </tr>
 
@@ -136,43 +138,69 @@ async sendChatErrorNotice(user) {
               <p>${notice}</p>
 
               <p>
-                Cuando esta función esté disponible, vas a poder configurar contactos de confianza
-                para que reciban alertas automáticas en situaciones de emergencia.
+                Estamos mejorando la app para que cada rider tenga más herramientas y no esté solo en la calle.
+                Esto recién empieza, y vos sos parte de eso.
               </p>
 
               <hr style="margin:20px 0;">
 
-              <h4>¿Cómo funciona?</h4>
+              <h3>💬 Chat Riders activo para todos</h3>
+              <p>
+                Ahora todos los usuarios pueden usar el <strong>Chat Riders</strong>.
+              </p>
 
-              <p>Al presionar:</p>
-
-              <ul>
-                <li>🚨 SOS Robo</li>
-                <li>🚑 SOS Accidente</li>
-              </ul>
-
-              <p>Se enviará automáticamente un mensaje por WhatsApp con:</p>
+              <p>
+                Usalo para compartir información en tiempo real:
+              </p>
 
               <ul>
-                <li>👤 Tu nombre</li>
-                <li>🏍️ Tu moto</li>
-                <li>🎨 Color</li>
-                <li>📍 Ubicación en tiempo real</li>
-                <li>⏰ Hora del evento</li>
+                <li>📍 Controles policiales</li>
+                <li>⚠️ Zonas complicadas</li>
+                <li>🚧 Cortes o situaciones en la calle</li>
               </ul>
 
               <p>
-                Esto permite avisar rápidamente a tus contactos ante cualquier situación.
+                Mientras más riders participen, más útil se vuelve.
               </p>
 
               <hr style="margin:20px 0;">
 
-              <p style="font-size:14px; color:#555;">
-                Te recomendamos configurar tus contactos de emergencia apenas la función esté disponible.
+              <h3>🚀 Esto depende de la comunidad</h3>
+              <p>
+                Rider SOS no es solo una app, es una red entre personas que están todos los días en la calle.
               </p>
 
+              <p>
+                Cuantos más seamos:
+              </p>
+
+              <ul>
+                <li>✔ Más información en tiempo real</li>
+                <li>✔ Más ayuda entre riders</li>
+                <li>✔ Más seguridad para todos</li>
+              </ul>
+
+              <p>
+                Si te sirve la app, recomendásela a otros riders.
+                Eso hace la diferencia.
+              </p>
+
+              <hr style="margin:20px 0;">
+
+              <h3>⚠️ Importante</h3>
+              <p>
+                Para acceder a todas las mejoras, asegurate de tener la última versión.
+              </p>
+
+              <div style="text-align:center; margin-top:20px;">
+                <a href="${appLink}" 
+                   style="background:#e74c3c; color:#ffffff; padding:12px 25px; text-decoration:none; border-radius:5px; font-weight:bold;">
+                  🔄 Actualizar App
+                </a>
+              </div>
+
               <p style="margin-top:30px;">
-                — Equipo Rider SOS
+                — Equipo Rider SOS Delivery
               </p>
 
             </td>
@@ -197,7 +225,7 @@ async sendChatErrorNotice(user) {
       email: process.env.EMAIL_FROM
     },
     to: [{ email: user.email, name: user.nombre }],
-    subject: '🚨– Contactos de emergencia',
+    subject: '🔥 Rider SOS crece con la comunidad',
     htmlContent,
     textContent: notice
   });

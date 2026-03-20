@@ -80,17 +80,33 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const contact = await database.addEmergencyContact({
-      userId,
-      nombre,
-      telefono,
-      relacion
-    });
+    // Guardar contacto
+    const result = await database.pool.query(
+      'INSERT INTO emergency_contacts (user_id, nombre, telefono, relacion) VALUES ($1, $2, $3) RETURNING *',
+      [userId, nombre, telefono, relacion]
+    );
 
-    res.status(201).json({
+    // 📱 ENVIAR MENSAJE DE VERIFICACIÓN AUTOMÁTICO
+    try {
+      const whatsappService = require('../services/whatsapp');
+      const userName = req.user.nombre || req.user.email;
+      
+      await whatsappService.sendInvitationMessage(
+        telefono,
+        userName,
+        nombre
+      );
+      
+      console.log(`📱 Invitación enviada a ${telefono} para ser contacto de emergencia`);
+    } catch (whatsappError) {
+      console.error('❌ Error enviando invitación:', whatsappError.message);
+      // No fallar el guardado si WhatsApp falla
+    }
+
+    res.json({
       success: true,
-      message: 'Contacto de emergencia agregado exitosamente',
-      contact
+      message: 'Contacto agregado. Se envió un mensaje de verificación.',
+      contact: result.rows[0]
     });
   } catch (error) {
     console.error('Error agregando contacto de emergencia:', error);

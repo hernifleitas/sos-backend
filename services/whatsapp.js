@@ -126,7 +126,70 @@ class WhatsAppService {
     }
   }
 
-  // 🔥 SOLO PARA DEV (opcional dejarlo)
+  // � ENVIAR MENSAJE DE INVITACIÓN
+  async sendInvitationMessage(contactPhone, userName, contactName) {
+    if (!this.isEnabled) {
+      console.log('WhatsApp no está configurado - Simulación de invitación');
+      return this.simulateInvitation(contactPhone, userName, contactName);
+    }
+
+    try {
+      const formattedPhone = this.formatPhone(contactPhone);
+      
+      const message = `👋 Hola ${contactName}!
+
+Soy ${userName} y quiero agregarte como contacto de emergencia en Rider SOS.
+
+¿Aceptas recibir alertas automáticas en caso de robo o accidente?
+
+Responde: ACEPTAR para confirmar
+Responde: RECHAZAR para cancelar`;
+
+      const response = await this.client.messages.create({
+        from: 'whatsapp:+5491136566333',
+        to: `whatsapp:${formattedPhone}`,
+        body: message
+      });
+
+      console.log(`📱 Invitación enviada a ${formattedPhone}:`, response.sid);
+      
+      return {
+        success: true,
+        messageId: response.sid,
+        phone: formattedPhone
+      };
+
+    } catch (error) {
+      console.error('❌ Error enviando invitación:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  simulateInvitation(contactPhone, userName, contactName) {
+    const message = `👋 Hola ${contactName}!
+
+Soy ${userName} y quiero agregarte como contacto de emergencia en Rider SOS.
+
+¿Aceptas recibir alertas automáticas en caso de robo o accidente?
+
+Responde: ACEPTAR para confirmar
+Responde: RECHAZAR para cancelar`;
+
+    console.log(`📱 SIMULACIÓN de invitación a ${contactPhone}`);
+    console.log(message);
+
+    return {
+      success: true,
+      simulated: true,
+      phone: contactPhone,
+      message
+    };
+  }
+
+  // �🔥 SOLO PARA DEV (opcional dejarlo)
   formatEmergencyMessage(userName, alertType, location, moto) {
     const alertEmoji = alertType === 'robo' ? '🚨' : '🚑';
     const alertText = alertType === 'robo' ? 'ROBO' : 'ACCIDENTE';
