@@ -326,7 +326,8 @@ if (esNotificable) {
                 nombre,
                 tipoAAlmacenar,
                 ubicacion,
-                `${moto} (${color})`
+                moto,
+                color
               );
               const successful = whatsappResults.filter(r => r.success).length;
               const failed = whatsappResults.filter(r => !r.success).length;

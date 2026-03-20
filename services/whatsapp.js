@@ -35,7 +35,7 @@ class WhatsAppService {
     return `+549${cleaned}`;
   }
 
-  async sendEmergencyMessage(emergencyContacts, userName, alertType, userLocation, userMoto) {
+  async sendEmergencyMessage(emergencyContacts, userName, alertType, userLocation, userMoto, userColor = null) {
     if (!this.isEnabled) {
       console.log('WhatsApp no está configurado - Simulación');
       return this.simulateMessage(emergencyContacts, userName, alertType, userLocation, userMoto);
@@ -73,16 +73,37 @@ class WhatsAppService {
 
           const googleMapsUrl = `https://maps.google.com/?q=${userLocation.lat},${userLocation.lng}`;
 
+          // Variables diferentes según tipo de alerta
+          let contentVariables;
+          
+          if (alertType === 'robo') {
+            // ROBO: 5 variables (nombre, vehículo, color, hora, ubicación)
+            contentVariables = JSON.stringify({
+              "1": userName,        // Nombre
+              "2": userMoto,         // Vehículo (solo moto)
+              "3": userColor || 'N/A', // Color
+              "4": new Date().toLocaleString('es-AR', {
+                timeZone: 'America/Argentina/Buenos_Aires'
+              }), // Hora
+              "5": googleMapsUrl     // Ubicación
+            });
+          } else {
+            // ACCIDENTE: 4 variables (nombre, moto+color, ubicación, hora)
+            contentVariables = JSON.stringify({
+              "1": userName,        // Nombre
+              "2": userColor ? `${userMoto} (${userColor})` : userMoto, // Moto + color
+              "3": googleMapsUrl,    // Ubicación
+              "4": new Date().toLocaleString('es-AR', {
+                timeZone: 'America/Argentina/Buenos_Aires'
+              }) // Hora
+            });
+          }
+
           const response = await this.client.messages.create({
             from: 'whatsapp:+5491136566333',
             to: `whatsapp:${formattedPhone}`,
             contentSid: templateSid,
-            contentVariables: JSON.stringify({
-              "1": userName,
-              "2": userMoto,
-              "3": googleMapsUrl,
-              "4": new Date().toLocaleString('es-AR')
-            })
+            contentVariables: contentVariables
           });
 
           console.log(`✅ Enviado a ${formattedPhone}: ${this.whatsappNumber}`, response.sid);
