@@ -61,6 +61,15 @@ app.get('/politica-privacidad', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/politica-privacidad.html'));
 });
 
+const notificarSOSAOtrosUsuarios = (sosData) => {
+  console.log(`🚨 ALERTA SOS: ${sosData.tipo.toUpperCase()} de ${sosData.nombre}`);
+  console.log(`📍 Ubicación: ${sosData.ubicacion.lat}, ${sosData.ubicacion.lng}`);
+  console.log(`🏍️ Moto: ${sosData.moto} (${sosData.color})`);
+  console.log(`⏰ Hora: ${sosData.fechaHora}`);
+  console.log('---');
+};
+
+
 
 // Guardar info de riders en memoria
 let riders = {};
