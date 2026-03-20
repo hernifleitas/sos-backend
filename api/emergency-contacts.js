@@ -82,7 +82,7 @@ router.post('/', async (req, res) => {
 
     // Guardar contacto
     const result = await database.pool.query(
-      'INSERT INTO emergency_contacts (user_id, nombre, telefono, relacion, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      'INSERT INTO emergency_contacts (user_id, nombre, telefono, relacion, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
       [userId, nombre, telefono, relacion, true, new Date(), new Date()]
     );
 
