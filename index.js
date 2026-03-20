@@ -9,7 +9,7 @@ const { Server } = require('socket.io');
 const { router: authRoutes } = require('./api/auth');
 const chatRoutes = require('./api/chat');
 const notificationsRoutes = require('./api/notifications');
-const notifications = require('./notifications');
+//const notifications = require('./notifications');
 const premiumRoutes = require('./api/premium');
 const analyticsRoutes = require('./api/analytics');
 const zonasPeligrosasRoutes = require('./api/zonas-peligrosas');
@@ -71,19 +71,6 @@ const ALERT_GRACE_MS = 10 * 60 * 1000; // 10 minutos de gracia
 // Anti-burst: recordar último recibido por rider para filtrar ráfagas de 'actualizacion'
 // { [riderId]: { ts: number, fechaIso: string, tipo: string } }
 let lastReceive = {};
-// Función para enviar notificación a otros usuarios sobre SOS
-const notificarSOSAOtrosUsuarios = (sosData) => {
-  // Esta función se puede expandir para enviar notificaciones push reales
-  // Por ahora, solo logueamos la información
-  console.log(`🚨 ALERTA SOS: ${sosData.tipo.toUpperCase()} de ${sosData.nombre}`);
-  console.log(`📍 Ubicación: ${sosData.ubicacion.lat}, ${sosData.ubicacion.lng}`);
-  console.log(`🏍️ Moto: ${sosData.moto} (${sosData.color})`);
-  console.log(`⏰ Hora: ${sosData.fechaHora}`);
-  console.log('---');
-
-  // Aquí se podría integrar con servicios como Firebase Cloud Messaging
-  // para enviar notificaciones push reales a otros usuarios
-};
 
 // Recibir ubicación/SOS
 app.post("/sos", async (req, res) => {
@@ -325,7 +312,7 @@ if (esNotificable) {
             const emergencyContacts = await database.getEmergencyContacts(decoded.id);
             if (emergencyContacts.length > 0) {
               console.log(` Enviando WhatsApp a ${emergencyContacts.length} contactos de emergencia...`);
-              const whatsappResults = await whatsappService.sendToMultipleContacts(
+              const whatsappResults = await whatsappService.sendEmergencyMessage(
                 emergencyContacts,
                 nombre,
                 tipoAAlmacenar,
