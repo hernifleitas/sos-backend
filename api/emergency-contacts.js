@@ -82,8 +82,8 @@ router.post('/', async (req, res) => {
 
     // Guardar contacto
     const result = await database.pool.query(
-      'INSERT INTO emergency_contacts (user_id, nombre, telefono, relacion) VALUES ($1, $2, $3) RETURNING *',
-      [userId, nombre, telefono, relacion]
+      'INSERT INTO emergency_contacts (user_id, nombre, telefono, relacion, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [userId, nombre, telefono, relacion, true, new Date(), new Date()]
     );
 
     // 📱 ENVIAR MENSAJE DE VERIFICACIÓN AUTOMÁTICO
