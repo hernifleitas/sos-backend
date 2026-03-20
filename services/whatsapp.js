@@ -133,32 +133,6 @@ class WhatsAppService {
       message
     };
   }
-
-  // 🔥 MÁXIMO 3 CONTACTOS
-  async sendToMultipleContacts(contacts, userName, alertType, userLocation, userMoto) {
-    const results = [];
-    const limitedContacts = contacts.slice(0, 3);
-
-    for (const contact of limitedContacts) {
-      if (!contact.telefono) continue;
-
-      const result = await this.sendEmergencyMessage(
-        contact.telefono,
-        userName,
-        alertType,
-        userLocation,
-        userMoto
-      );
-
-      results.push({
-        contactId: contact.id,
-        contactName: contact.nombre,
-        ...result
-      });
-    }
-
-    return results;
-  }
 }
 
 module.exports = new WhatsAppService();

@@ -14,9 +14,18 @@ router.get('/', async (req, res) => {
     const userId = req.user.id;
     const contacts = await database.getEmergencyContacts(userId);
     
+    // Obtener rol del usuario para determinar límite
+    const userResult = await database.pool.query(
+      'SELECT role FROM users WHERE id = $1',
+      [userId]
+    );
+    const user = userResult.rows[0];
+const maxContacts = user && user.role === 'premium' ? 3 : 1;
+    
     res.json({
       success: true,
-      contacts
+      contacts,
+      maxContacts
     });
   } catch (error) {
     console.error('Error obteniendo contactos de emergencia:', error);

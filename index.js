@@ -21,7 +21,7 @@ const app = express();
 // Rate limiting desactivado temporalmente para pruebas
 // const limiter = rateLimit({
 //   windowMs: 15 * 60 * 1000, // 15 minutos
-//   max: 2000, // Aumentar a 2000 solicitudes (133 por minuto) - muy generoso
+//   max: 2000, // Aumentar a 2000 solicitudes (133 por minuto)
 //   message: {
 //     error: "Too many requests, please try again later."
 //   },
